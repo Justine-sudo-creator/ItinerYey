@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <path 
+    d="M40 8C23.43 8 10 21.43 10 38c0 22.5 30 38 30 38s30-15.5 30-38c0-16.57-13.43-30-30-30z" 
+    fill="#E25C43" 
+    stroke="#2D3748" 
+    stroke-width="4.5" 
+    stroke-linejoin="round"
+  />
+  <text 
+    x="40" 
+    y="48" 
+    fill="#FCF5E3" 
+    stroke="#2D3748" 
+    stroke-width="2" 
+    font-family="system-ui, -apple-system, sans-serif" 
+    font-weight="900" 
+    font-size="28" 
+    text-anchor="middle"
+  >₱</text>
+</svg>

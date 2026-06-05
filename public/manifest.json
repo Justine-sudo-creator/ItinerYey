@@ -1,0 +1,9 @@
+{
+  "name": "ItinerYey",
+  "short_name": "ItinerYey",
+  "theme_color": "#F97316",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": []
+}
