@@ -83,9 +83,10 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // protected routes
-  const protectedRoutes = ['/onboarding', '/submit', '/saved', '/profile']
+  // protected routes (submit is excluded here so SubmitPage page-level logic handles it with returnTo query support)
+  const protectedRoutes = ['/onboarding', '/saved', '/profile']
   const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
+
 
   if (isProtectedRoute && !user) {
     // redirect to login
