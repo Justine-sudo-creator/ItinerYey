@@ -23,36 +23,42 @@ function getISOWeekNumber(d: Date) {
 
 const CHALLENGES_QUEUE = [
   {
-    hashtag: 'CommuterDream',
+    hashtag: 'Challenge||CommuterDream',
     title: '100% Commuter Challenge',
     description: 'Share a day-trip using only public transport (jeeps, trikes, buses, trains). No private cars allowed!',
-    reward_badge: 'Transit Master'
+    reward_badge: 'Transit Master||₱500 GCash',
+    created_at: new Date(Date.now() - 2 * 3600000).toISOString() // 2h ago
   },
   {
-    hashtag: 'RizalOvernight',
-    title: 'Rizal Overnight Escape',
-    description: 'Share your best overnight budget trip to Rizal under ₱2,500 per head.',
-    reward_badge: 'Rizal Explorer'
+    hashtag: 'Weather||RainySeasonAlert',
+    title: 'Habagat Travel Advisory',
+    description: 'Heavy rains and wind warnings are up for Northern Luzon. If you have Elyu or Baguio trips planned, keep safe and double-check road advisories!',
+    reward_badge: '||||https://pagasa.dost.gov.ph||https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=500',
+    created_at: new Date(Date.now() - 6 * 3600000).toISOString() // 6h ago
   },
   {
-    hashtag: 'SoloFoodie',
-    title: 'Solo Food Crawl',
-    description: 'Share your ultimate food crawl itinerary and costs under ₱1,200 per head.',
-    reward_badge: 'Gourmet Planner'
+    hashtag: 'Shoutout||LeaderboardSpotlight',
+    title: 'Top Contributor Spotlight!',
+    description: 'Shoutout to our top contributor @JustineMationg for sharing 3 amazing budget itineraries and leading the leaderboard! Salute!',
+    reward_badge: '||||/profile?id=justine-id||',
+    created_at: new Date(Date.now() - 24 * 3600000).toISOString() // Yesterday
   },
   {
-    hashtag: 'BarkadaOnABudget',
-    title: 'Barkada Tagaytay Outing',
-    description: 'Share an itinerary and costs for a group of 4+ pax under ₱1,500 per head.',
-    reward_badge: 'Barkada Leader'
+    hashtag: 'News||RemixFeature',
+    title: 'New Feature: Remix Itineraries',
+    description: 'You can now copy any public trip itinerary as a custom template in your own locker. Plan faster, customize budget categories, and go!',
+    reward_badge: '||||/submit||https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=500',
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString() // 3d ago
   },
   {
-    hashtag: 'ElyuBeachVibe',
+    hashtag: 'Challenge||ElyuBeachVibe',
     title: 'La Union Beach Trip',
     description: 'Share a weekend beach budget for San Juan, La Union under ₱4,000 per head.',
-    reward_badge: 'Wave Chaser'
+    reward_badge: 'Wave Chaser||₱500 GCash',
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString() // 5d ago
   }
 ];
+
 
 type Filters = {
   destinationTypes: string[];
@@ -83,6 +89,27 @@ interface ActiveChallenge {
   hashtag: string;
   description: string;
   reward_badge: string;
+  created_at?: string;
+}
+
+function formatRelativeTime(dateStr: string | undefined | null) {
+  if (!dateStr) return null;
+  try {
+    const created = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    if (diffMs < 0) return 'Just now';
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays}d ago`;
+  } catch (e) {
+    return null;
+  }
 }
 
 export function BrowseFeed() {
@@ -424,59 +451,173 @@ export function BrowseFeed() {
       
       {/* 2-Column Section: Active Challenge (Left) & Leaderboard Widget (Right) */}
       <div className="grid grid-cols-12 gap-3 w-full">
-        {/* Left Column: Active Challenge */}
+        {/* Left Column: Bulletin Board */}
         <div className="col-span-7 md:col-span-8 flex">
-          {activeChallenge ? (
-            <div className="w-full bg-accent-yellow/15 border border-border-dark/15 rounded-lg p-3 md:p-5 shadow-sm flex flex-col justify-between relative overflow-hidden bg-[url('/noise.png')] h-[210px] md:h-[240px]">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[8px] md:text-[10px] font-black tracking-widest uppercase bg-accent-yellow border border-border-dark/15 rounded px-1.5 py-0.5 shadow-sm">
-                    Challenge
-                  </span>
-                  <div className="inline-block px-1.5 py-0.5 bg-accent-blue text-white border border-border-dark/15 rounded font-black text-[9px] md:text-xs tracking-wide">
-                    #{activeChallenge.hashtag}
+          {activeChallenge ? (() => {
+            const hashtagRaw = activeChallenge.hashtag || '';
+            let type = 'Challenge';
+            let hashtag = '';
+            if (hashtagRaw.includes('||')) {
+              const parts = hashtagRaw.split('||');
+              type = parts[0] || 'Challenge';
+              hashtag = parts[1] || '';
+            } else {
+              hashtag = hashtagRaw;
+            }
+
+            const rewardRaw = activeChallenge.reward_badge || '';
+            let badge = '';
+            let reward = '';
+            let actionLink = '';
+            let polaroidUrl = '';
+            if (rewardRaw.includes('||')) {
+              const parts = rewardRaw.split('||');
+              badge = parts[0] || '';
+              reward = parts[1] || '';
+              actionLink = parts[2] || '';
+              polaroidUrl = parts[3] || '';
+            } else {
+              badge = rewardRaw;
+            }
+
+            const relativeTime = activeChallenge.created_at ? formatRelativeTime(activeChallenge.created_at) : null;
+
+            const NOTE_STYLES: Record<string, { bg: string; badgeBg: string; text: string; label: string; icon: string }> = {
+              Challenge: {
+                bg: 'bg-[#FEF08A] text-[#713F12]', // Yellow
+                badgeBg: 'bg-[#CA8A04] text-white',
+                text: 'text-[#854D0E]',
+                label: 'Challenge',
+                icon: '🏆'
+              },
+              Weather: {
+                bg: 'bg-[#E0F2FE] text-[#0369A1]', // Blue
+                badgeBg: 'bg-[#0284C7] text-white',
+                text: 'text-[#075985]',
+                label: 'Weather',
+                icon: '🌦️'
+              },
+              Shoutout: {
+                bg: 'bg-[#FFE4E6] text-[#BE123C]', // Pink/Rose
+                badgeBg: 'bg-[#E11D48] text-white',
+                text: 'text-[#9F1239]',
+                label: 'Shoutout',
+                icon: '📣'
+              },
+              News: {
+                bg: 'bg-[#DCFCE7] text-[#15803D]', // Mint/Green
+                badgeBg: 'bg-[#16A34A] text-white',
+                text: 'text-[#166534]',
+                label: 'News',
+                icon: '⚡'
+              },
+              General: {
+                bg: 'bg-[#FAFAF9] text-[#44403C]', // Cream
+                badgeBg: 'bg-[#57534E] text-white',
+                text: 'text-[#292524]',
+                label: 'Notice',
+                icon: '📌'
+              }
+            };
+
+            const style = NOTE_STYLES[type] || NOTE_STYLES[type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()] || NOTE_STYLES.General;
+
+            return (
+              <div className="w-full bg-[#E5D3C3] border-4 border-[#785942] rounded-lg p-2 md:p-3 shadow-hard relative flex gap-3 h-[210px] md:h-[240px] overflow-hidden bg-[radial-gradient(#cbb09c_2px,transparent_2px)] [background-size:16px_16px]">
+                {/* Pinned Sticky Note */}
+                <div className={`flex-grow flex flex-col justify-between p-3 md:p-4 shadow-md border border-black/10 rotate-[-1.5deg] relative transition-transform hover:rotate-0 duration-200 ${style.bg}`}>
+                  {/* Pushpin at the top center */}
+                  <div className="absolute top-[-8px] left-1/2 -translate-x-1/2 z-20 text-sm md:text-lg drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.35)] select-none">
+                    📌
                   </div>
-                </div>
-                <h2 className="font-display font-black text-xs md:text-lg lg:text-xl text-primary tracking-tight leading-tight mt-2 line-clamp-1">
-                  {activeChallenge.title}
-                </h2>
-                <p className="text-[9px] md:text-xs lg:text-sm font-bold text-secondary leading-snug mt-1 max-w-3xl line-clamp-3 md:line-clamp-4">
-                  {activeChallenge.description}
-                </p>
-              </div>
-              
-              <div className="flex items-center justify-between gap-2 shrink-0 pt-2 border-t border-border-dark/10 border-dashed mt-2">
-                {(() => {
-                  const [badgePart, customPart] = (activeChallenge.reward_badge || '').split('||');
-                  return (
-                    <div className="flex flex-wrap gap-1 md:gap-2 max-w-full overflow-hidden">
-                      {badgePart && badgePart.trim() && (
-                        <span className="text-[8px] md:text-xs font-black text-accent-coral bg-white border border-border-dark/15 rounded px-1.5 py-0.5 shadow-sm inline-block whitespace-nowrap">
-                          {badgePart.trim()}
-                        </span>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[7px] md:text-[9px] font-black tracking-widest uppercase border border-black/10 rounded px-1.5 py-0.5 shadow-sm ${style.badgeBg}`}>
+                        {style.icon} {style.label}
+                      </span>
+                      {hashtag && (
+                        <div className="inline-block px-1.5 py-0.5 bg-[#4A3728] text-white border border-black/10 rounded font-black text-[8px] md:text-[10px] tracking-wide">
+                          #{hashtag}
+                        </div>
                       )}
-                      {customPart && customPart.trim() && (
-                        <span className="text-[8px] md:text-xs font-black text-accent-green bg-white border border-border-dark/15 rounded px-1.5 py-0.5 shadow-sm inline-block whitespace-nowrap">
-                          {customPart.trim()}
+                      {relativeTime && (
+                        <span className="text-[7px] md:text-[9px] font-black uppercase tracking-wide opacity-50 ml-1">
+                          · {relativeTime}
                         </span>
                       )}
                     </div>
-                  );
-                })()}
-                {isAdmin && (
-                  <Link 
-                    href="/admin"
-                    className="text-[8px] md:text-[10px] font-bold uppercase underline hover:text-accent-coral cursor-pointer shrink-0 align-bottom"
-                  >
-                    <span className="hidden md:inline">Edit Challenge</span>
-                    <span className="md:hidden">Edit</span>
-                  </Link>
+                    <h2 className="font-display font-black text-xs md:text-base lg:text-lg text-primary tracking-tight leading-tight mt-1.5 line-clamp-1">
+                      {activeChallenge.title}
+                    </h2>
+                    <p className={`text-[9px] md:text-xs font-bold leading-snug mt-1 line-clamp-2 md:line-clamp-3 ${style.text}`}>
+                      {activeChallenge.description}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-2 shrink-0 pt-1.5 border-t border-black/10 border-dashed mt-1.5">
+                    {/* Action link or reward badges */}
+                    <div className="flex flex-wrap gap-1 max-w-full overflow-hidden">
+                      {type.toLowerCase() === 'challenge' ? (
+                        <>
+                          {badge && (
+                            <span className="text-[7px] md:text-[9px] font-black text-[#BE123C] bg-white border border-black/15 rounded px-1.5 py-0.5 shadow-sm inline-block whitespace-nowrap">
+                              {badge}
+                            </span>
+                          )}
+                          {reward && (
+                            <span className="text-[7px] md:text-[9px] font-black text-[#15803D] bg-white border border-black/15 rounded px-1.5 py-0.5 shadow-sm inline-block whitespace-nowrap">
+                              {reward}
+                            </span>
+                          )}
+                        </>
+                      ) : actionLink ? (
+                        <Link 
+                          href={actionLink}
+                          target={actionLink.startsWith('http') ? '_blank' : undefined}
+                          rel={actionLink.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          className="px-2 py-0.5 text-[7px] md:text-[9px] font-black uppercase bg-[#4A3728] text-white border border-black/20 rounded shadow-sm hover:translate-y-0.5 hover:shadow-none transition-all"
+                        >
+                          {actionLink.startsWith('http') ? 'Read More →' : 'See Details →'}
+                        </Link>
+                      ) : null}
+                    </div>
+
+                    {isAdmin && (
+                      <Link 
+                        href="/admin"
+                        className="text-[7px] md:text-[9px] font-black uppercase underline text-[#4A3728] hover:text-accent-coral cursor-pointer shrink-0 align-bottom"
+                      >
+                        Edit Board
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                {/* Optional Polaroid Photo */}
+                {polaroidUrl && (
+                  <div className="absolute right-3 top-3 sm:static flex flex-col bg-white border border-black/10 p-1.5 pb-3 shadow-md rotate-[4deg] sm:rotate-[2deg] hover:rotate-0 duration-200 transition-transform w-[70px] md:w-[100px] shrink-0 sm:self-center z-10">
+                    <div className="absolute top-[-6px] left-1/2 -translate-x-1/2 z-20 text-[10px] md:text-sm drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.3)] select-none">
+                      📍
+                    </div>
+                    <div className="w-full aspect-square relative bg-[#1E1E1E] overflow-hidden border border-black/5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={polaroidUrl} 
+                        alt="Pinned photo" 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="text-center font-display font-bold text-[5px] md:text-[8px] text-secondary mt-1 truncate">
+                      {hashtag || 'Byahe'}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="w-full bg-soft-beige/30 border border-border-dark/10 rounded-lg p-4 shadow-sm flex flex-col justify-center items-center text-center h-[210px] md:h-[240px]">
-              <p className="text-xs font-bold text-secondary">No active challenge right now.</p>
+            );
+          })() : (
+            <div className="w-full bg-[#E5D3C3] border-4 border-[#785942] rounded-lg p-4 shadow-hard flex justify-center items-center text-center h-[210px] md:h-[240px]">
+              <p className="text-xs font-bold text-[#4A3728]">Paskilan is empty right now.</p>
             </div>
           )}
         </div>

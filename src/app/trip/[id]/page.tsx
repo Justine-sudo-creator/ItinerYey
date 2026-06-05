@@ -10,14 +10,63 @@ import { TripPhoto, Trip } from '@/types/supabase';
 
 export default async function TripDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const userId = session?.user?.id || null;
 
-  const { data: trip, error: tripError } = await supabase
+  // Round 1: Fetch initial trip details, session, and potential related trips in parallel
+  const sessionPromise = supabase.auth.getSession();
+  const tripPromise = supabase
     .from('trips')
     .select('*, trip_stops(*), users!trips_user_id_fkey(display_name, avatar_url)')
     .eq('id', params.id)
     .single();
+
+  const photosPromise = supabase
+    .from('trip_photos')
+    .select('*')
+    .eq('trip_id', params.id);
+
+  const daysPromise = supabase
+    .from('trip_days')
+    .select('*')
+    .eq('trip_id', params.id);
+
+  const hostingsPromise = supabase
+    .from('trip_hosting')
+    .select('*, users!trip_hosting_host_user_id_fkey(display_name, avatar_url, is_verified_organizer, vouch_count)')
+    .eq('trip_id', params.id)
+    .in('status', ['open', 'full']);
+
+  const potentialTripsPromise = supabase
+    .from('trips')
+    .select('*, users!trips_user_id_fkey(display_name, avatar_url)')
+    .eq('is_approved', true)
+    .neq('id', params.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  const [
+    sessionResult,
+    tripResult,
+    photosResult,
+    daysResult,
+    hostingsResult,
+    potentialTripsResult
+  ] = await Promise.all([
+    sessionPromise,
+    tripPromise,
+    photosPromise,
+    daysPromise,
+    hostingsPromise,
+    potentialTripsPromise
+  ]);
+
+  const session = sessionResult.data.session;
+  const userId = session?.user?.id || null;
+  const trip = tripResult.data;
+  const tripError = tripResult.error;
+  const photos = photosResult.data || [];
+  const days = daysResult.data || [];
+  const hostingsData = hostingsResult.data || [];
+  const potentialTrips = potentialTripsResult.data || [];
 
   if (tripError || !trip) {
     return (
@@ -53,27 +102,76 @@ export default async function TripDetailPage({ params }: { params: { id: string 
     );
   }
 
-  // Fetch photos
-  const { data: photos } = await supabase
-    .from('trip_photos')
-    .select('*')
-    .eq('trip_id', trip.id);
-
-  // Fetch days
-  const { data: days } = await supabase
-    .from('trip_days')
-    .select('*')
-    .eq('trip_id', trip.id);
-
-  // Fetch business (Featured Local Spot)
-  const currentDate = new Date().toISOString();
-  const { data: businessData } = await supabase
+  // Round 2 Parallel Requests: Fetch business features, user relationships, and related photo contents
+  const businessPromise = supabase
     .from('businesses')
     .select('*')
     .eq('destination', trip.destination)
     .eq('is_featured', true)
     .limit(1);
-    
+
+  const profilePromise = userId
+    ? supabase.from('users').select('has_contributed, access_expires_at').eq('id', userId).single()
+    : Promise.resolve({ data: null, error: null });
+
+  const savedTripPromise = userId
+    ? supabase.from('saved_trips').select('id').match({ user_id: userId, trip_id: trip.id }).maybeSingle()
+    : Promise.resolve({ data: null, error: null });
+
+  // Calculate related trips using scoring
+  const { getRelatedTripScore } = await import('@/lib/locations');
+  const relatedTrips = [...potentialTrips]
+    .sort((a, b) => getRelatedTripScore(trip, b) - getRelatedTripScore(trip, a))
+    .slice(0, 4);
+
+  const relatedIds = relatedTrips.map(t => t.id);
+  const relatedPhotosPromise = relatedIds.length > 0
+    ? supabase.from('trip_photos').select('*').eq('is_hero', true).in('trip_id', relatedIds)
+    : Promise.resolve({ data: null, error: null });
+
+  const hostingIds = hostingsData.map(h => h.id);
+  const membersPromise = hostingIds.length > 0
+    ? supabase.from('trip_hosting_members').select('hosting_id, status').in('hosting_id', hostingIds)
+    : Promise.resolve({ data: null, error: null });
+
+  const membershipsPromise = userId
+    ? supabase.from('trip_hosting_members').select('hosting_id').eq('user_id', userId)
+    : Promise.resolve({ data: null, error: null });
+
+  const [
+    businessResult,
+    profileResult,
+    savedResult,
+    relatedPhotosResult,
+    membersResult,
+    membershipsResult
+  ] = await Promise.all([
+    businessPromise,
+    profilePromise,
+    savedResultPromiseCheck(savedTripPromise),
+    relatedPhotosPromise,
+    membersPromise,
+    membershipsPromise
+  ]);
+
+  // Helper helper to handle maybeSingle errors safely in Promise.all destructuring
+  async function savedResultPromiseCheck(promise: any) {
+    try {
+      const res = await promise;
+      return res;
+    } catch {
+      return { data: null };
+    }
+  }
+
+  const businessData = businessResult.data;
+  const profile = profileResult.data;
+  const savedTrip = savedResult?.data;
+  const relatedPhotos = relatedPhotosResult?.data || [];
+  const membersData = membersResult?.data || [];
+  const memberships = membershipsResult?.data || [];
+
+  const currentDate = new Date().toISOString();
   let business = null;
   if (businessData && businessData.length > 0) {
     const b = businessData[0];
@@ -84,89 +182,15 @@ export default async function TripDetailPage({ params }: { params: { id: string 
     }
   }
 
-  // Fetch User profile logic
-  let hasContributed = false;
-  let accessExpiresAt = null;
-  let initialSaved = false;
-
-  if (userId) {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('has_contributed, access_expires_at')
-      .eq('id', userId)
-      .single();
-
-    if (profile) {
-      hasContributed = profile.has_contributed;
-      accessExpiresAt = profile.access_expires_at;
-    }
-
-    const { data: savedTrip } = await supabase
-      .from('saved_trips')
-      .select('id')
-      .match({ user_id: userId, trip_id: trip.id })
-      .single();
-
-    if (savedTrip) {
-      initialSaved = true;
-    }
-  }
-
-  // Fetch Related Trips using scoring
-  const { data: potentialTrips } = await supabase
-    .from('trips')
-    .select('*, users!trips_user_id_fkey(display_name, avatar_url)')
-    .eq('is_approved', true)
-    .neq('id', trip.id)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  let relatedTrips: Trip[] = [];
-  if (potentialTrips) {
-    const { getRelatedTripScore } = await import('@/lib/locations');
-    relatedTrips = [...potentialTrips]
-      .sort((a, b) => getRelatedTripScore(trip, b) - getRelatedTripScore(trip, a))
-      .slice(0, 4);
-  }
-
-  let relatedPhotos: TripPhoto[] = [];
-  if (relatedTrips.length > 0) {
-    const relatedIds = relatedTrips.map(t => t.id);
-    const { data: rPhotos } = await supabase
-      .from('trip_photos')
-      .select('*')
-      .eq('is_hero', true)
-      .in('trip_id', relatedIds);
-    relatedPhotos = rPhotos || [];
-  }
-  // Fetch active hostings for this trip (status = 'open' or 'full')
-  const { data: hostingsData } = await supabase
-    .from('trip_hosting')
-    .select('*, users!trip_hosting_host_user_id_fkey(display_name, avatar_url, is_verified_organizer, vouch_count)')
-    .eq('trip_id', trip.id)
-    .in('status', ['open', 'full']);
-
-  const hostingIds = hostingsData ? hostingsData.map(h => h.id) : [];
-  const { data: membersData } = hostingIds.length > 0 ? await supabase
-    .from('trip_hosting_members')
-    .select('hosting_id, status')
-    .in('hosting_id', hostingIds) : { data: [] };
-
-  let joinedHostingIds: string[] = [];
-  if (userId) {
-    const { data: memberships } = await supabase
-      .from('trip_hosting_members')
-      .select('hosting_id')
-      .eq('user_id', userId);
-    if (memberships) {
-      joinedHostingIds = memberships.map(m => m.hosting_id);
-    }
-  }
+  let hasContributed = profile?.has_contributed || false;
+  let accessExpiresAt = profile?.access_expires_at || null;
+  let initialSaved = !!savedTrip;
+  let joinedHostingIds = memberships ? memberships.map((m: any) => m.hosting_id) : [];
 
   // Map members to hostings and Sort: Boosted hostings (boost_status = approved) first, then recently created
   const hostings = hostingsData ? [...hostingsData].map(h => ({
     ...h,
-    trip_hosting_members: (membersData || []).filter(m => m.hosting_id === h.id)
+    trip_hosting_members: (membersData || []).filter((m: any) => m.hosting_id === h.id)
   })).sort((a, b) => {
     const aBoosted = a.is_boosted && a.boost_status === 'approved';
     const bBoosted = b.is_boosted && b.boost_status === 'approved';
@@ -179,8 +203,8 @@ export default async function TripDetailPage({ params }: { params: { id: string 
     <div className="w-full pb-12">
       <TripDetailView 
         trip={trip}
-        photos={photos || []}
-        days={days || []}
+        photos={photos}
+        days={days}
         business={business}
         userId={userId}
         initialHasContributed={hasContributed}
@@ -194,3 +218,5 @@ export default async function TripDetailPage({ params }: { params: { id: string 
     </div>
   );
 }
+
+

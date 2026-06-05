@@ -94,22 +94,6 @@ export default function ProfileTripCard({
             Delete
           </button>
         </div>
-
-        <div className="mt-2 flex gap-2">
-          {trip.is_approved ? (
-            <Link href={`/trip/${trip.id}/card`} className="flex-1">
-              <button className="w-full py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide border border-border-dark/15 rounded bg-surface hover:bg-soft-beige transition-colors shadow-sm">
-                Generate Card
-              </button>
-            </Link>
-          ) : (
-            <Link href={`/trip/${trip.id}/card`} className="flex-1">
-              <button className="w-full py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide border border-border-dark/15 rounded bg-surface hover:bg-soft-beige transition-colors shadow-sm">
-                Preview Card
-              </button>
-            </Link>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import MyMeetups from './MyMeetups';
 import VouchButton from './VouchButton';
 import PhProvincesMap from './PhProvincesMap';
 import MapShareCard from './MapShareCard';
+import SavedTripsContainer from '@/components/saved/SavedTripsContainer';
 
 type ProfileContainerProps = {
   userProfile: User;
@@ -147,17 +148,14 @@ export default function ProfileContainer({
             />
           )}
 
-          {mainTab === 'saved' && (() => {
-            const SavedTripsContainer = require('@/components/saved/SavedTripsContainer').default;
-            return (
-              <div className="animate-in fade-in">
-                <SavedTripsContainer 
-                  initialSavedTrips={savedTrips} 
-                  currentUserId={userProfile.id}
-                />
-              </div>
-            );
-          })()}
+          {mainTab === 'saved' && (
+            <div className="animate-in fade-in">
+              <SavedTripsContainer 
+                initialSavedTrips={savedTrips} 
+                currentUserId={userProfile.id}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="w-full">

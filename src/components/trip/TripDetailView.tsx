@@ -667,10 +667,25 @@ export function TripDetailView({
                 Shared by {trip.users?.display_name ? `@${trip.users.display_name}` : 'Traveler'}
               </p>
             </Link>
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-primary mb-2 leading-tight">
-              {trip.destination}
-            </h1>
-            <p className="text-secondary font-bold text-lg mb-3">{trip.destination_region}</p>
+            {trip.trip_name && trip.trip_name.trim() !== '' && trip.trip_name.trim().toLowerCase() !== trip.destination.trim().toLowerCase() ? (
+              <>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-primary mb-1 leading-tight">
+                  {trip.trip_name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-1.5 text-secondary font-bold text-lg mb-3">
+                  <MapPin className="w-5 h-5 text-secondary shrink-0" />
+                  <span>{trip.destination}</span>
+                  <span className="text-secondary font-bold">· {trip.destination_region}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-primary mb-2 leading-tight">
+                  {trip.destination}
+                </h1>
+                <p className="text-secondary font-bold text-lg mb-3">{trip.destination_region}</p>
+              </>
+            )}
 
             {/* Tags / Badges */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -1120,126 +1135,130 @@ export function TripDetailView({
             </p>
           </div>
           
-          <div className="flex flex-col gap-4">
-            {localHostings
-              .filter((host) => {
-                if (host.status === 'open') return true;
-                // For full meetups, only show if user is the host, an admin, or has joined/requested
-                return host.host_user_id === userId || isAdmin || joinedHostingIds.includes(host.id);
-              })
-              .map((host) => {
-                const isApprovedBoost = (() => {
-                  if (!host.is_boosted || host.boost_status !== 'approved' || !host.boosted_at) {
-                    return false;
-                  }
-                  const boostedDate = new Date(host.boosted_at).getTime();
-                  const eventDate = new Date(host.target_date).getTime();
-                  const now = Date.now();
-                  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-                  return (now - boostedDate) < sevenDaysMs && now < eventDate;
-                })();
-                const isOwner = host.host_user_id === userId;
-                const isFull = host.status === 'full';
-                return (
-                  <div 
-                    key={host.id} 
-                    className={`p-4 border border-border-dark/15 bg-soft-beige/30 rounded-lg shadow-sm relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isApprovedBoost ? 'border-accent-yellow ring-2 ring-accent-yellow/50 bg-accent-yellow/5' : ''}`}
-                  >
-                    {isApprovedBoost && (
-                      <span className="absolute -top-3 left-4 text-[9px] font-black uppercase bg-accent-yellow text-primary border border-border-dark/15 px-1.5 py-0.5 rounded shadow-sm">
-                      FEATURED HOST
-                      </span>
-                    )}
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 shrink-0 bg-accent-yellow border border-border-dark/15 rounded-full flex items-center justify-center font-bold text-primary uppercase text-xs overflow-hidden">
-                          {host.users?.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={host.users.avatar_url} alt="Host Avatar" className="w-full h-full object-cover" />
-                          ) : (
-                            (host.users?.display_name || 'Traveler').charAt(0)
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <p className="font-bold text-sm text-primary">
-                              Hosted by {host.users?.display_name ? `@${host.users.display_name}` : 'Anonymous Host'}
-                            </p>
-                            {host.users?.is_verified_organizer && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] bg-accent-blue text-white border border-accent-blue/30 px-1 font-bold rounded">
-                                <BadgeCheck className="w-3 h-3 text-white fill-white/20 shrink-0" />
-                                VERIFIED
-                              </span>
-                            )}
-                            {(host.users?.vouch_count || 0) > 0 && (
-                              <span className="inline-flex items-center text-[9px] bg-accent-coral text-white border border-accent-coral/30 px-1 font-bold rounded uppercase tracking-wide">
-                                ★ {host.users.vouch_count} Vouches
-                              </span>
-                            )}
-                            {isFull && (
-                              <span className="inline-flex items-center text-[9px] bg-accent-coral text-white border border-accent-coral/30 px-1.5 font-black rounded uppercase">
-                                FULL
-                              </span>
+          {(() => {
+            const visibleMeetups = localHostings.filter((host) => {
+              if (host.status === 'open') return true;
+              return host.host_user_id === userId || isAdmin || joinedHostingIds.includes(host.id);
+            });
+            const shouldScroll = visibleMeetups.length > 2;
+
+            return (
+              <div className={`flex flex-col gap-4 ${shouldScroll ? 'max-h-[380px] overflow-y-auto pr-2' : ''}`}>
+                {visibleMeetups.map((host) => {
+                  const isApprovedBoost = (() => {
+                    if (!host.is_boosted || host.boost_status !== 'approved' || !host.boosted_at) {
+                      return false;
+                    }
+                    const boostedDate = new Date(host.boosted_at).getTime();
+                    const eventDate = new Date(host.target_date).getTime();
+                    const now = Date.now();
+                    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+                    return (now - boostedDate) < sevenDaysMs && now < eventDate;
+                  })();
+                  const isOwner = host.host_user_id === userId;
+                  const isFull = host.status === 'full';
+                  return (
+                    <div 
+                      key={host.id} 
+                      className={`p-4 border border-border-dark/15 bg-soft-beige/30 rounded-lg shadow-sm relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isApprovedBoost ? 'border-accent-yellow ring-2 ring-accent-yellow/50 bg-accent-yellow/5' : ''}`}
+                    >
+                      {isApprovedBoost && (
+                        <span className="absolute -top-3 left-4 text-[9px] font-black uppercase bg-accent-yellow text-primary border border-border-dark/15 px-1.5 py-0.5 rounded shadow-sm">
+                        FEATURED HOST
+                        </span>
+                      )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-8 h-8 shrink-0 bg-accent-yellow border border-border-dark/15 rounded-full flex items-center justify-center font-bold text-primary uppercase text-xs overflow-hidden">
+                            {host.users?.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={host.users.avatar_url} alt="Host Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              (host.users?.display_name || 'Traveler').charAt(0)
                             )}
                           </div>
-                          <p className="text-[10px] font-bold text-secondary">
-                            Target Date: {new Date(host.target_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                          </p>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="font-bold text-sm text-primary">
+                                Hosted by {host.users?.display_name ? `@${host.users.display_name}` : 'Anonymous Host'}
+                              </p>
+                              {host.users?.is_verified_organizer && (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] bg-accent-blue text-white border border-accent-blue/30 px-1 font-bold rounded">
+                                  <BadgeCheck className="w-3 h-3 text-white fill-white/20 shrink-0" />
+                                  VERIFIED
+                                </span>
+                              )}
+                              {(host.users?.vouch_count || 0) > 0 && (
+                                <span className="inline-flex items-center text-[9px] bg-accent-coral text-white border border-accent-coral/30 px-1 font-bold rounded uppercase tracking-wide">
+                                  ★ {host.users.vouch_count} Vouches
+                                </span>
+                              )}
+                              {isFull && (
+                                <span className="inline-flex items-center text-[9px] bg-accent-coral text-white border border-accent-coral/30 px-1.5 font-black rounded uppercase">
+                                  FULL
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] font-bold text-secondary">
+                              Target Date: {new Date(host.target_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      {host.host_note && (
-                        <p className="text-xs font-semibold text-primary bg-white p-2 border border-border-dark/15 rounded mt-1 whitespace-pre-wrap">
-                          {host.host_note}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-col md:items-end justify-between gap-2 shrink-0 w-full md:w-auto">
-                       <div className="text-xs font-bold text-secondary">
-                        Slots Filled: <span className="text-primary font-black text-sm bg-accent-coral/10 border border-accent-coral/30 px-1.5 py-0.5 rounded">
-                          {host.trip_hosting_members?.filter((m: any) => m.status === 'approved').length || 0} of {host.slots_needed} spots
-                        </span>
+                        {host.host_note && (
+                          <p className="text-xs font-semibold text-primary bg-white p-2 border border-border-dark/15 rounded mt-1 whitespace-pre-wrap">
+                            {host.host_note}
+                          </p>
+                        )}
                       </div>
                       
-                      {isOwner ? (
-                        <div className="flex flex-wrap gap-2 w-full md:w-auto mt-2">
-                          {!isFull && (
+                      <div className="flex flex-col md:items-end justify-between gap-2 shrink-0 w-full md:w-auto">
+                         <div className="text-xs font-bold text-secondary">
+                          Slots Filled: <span className="text-primary font-black text-sm bg-accent-coral/10 border border-accent-coral/30 px-1.5 py-0.5 rounded">
+                            {host.trip_hosting_members?.filter((m: any) => m.status === 'approved').length || 0} of {host.slots_needed} spots
+                          </span>
+                        </div>
+                        
+                        {isOwner ? (
+                          <div className="flex flex-wrap gap-2 w-full md:w-auto mt-2">
+                            {!isFull && (
+                              <button
+                                onClick={() => handleUpdateHostingStatus(host.id, 'full')}
+                                disabled={updatingHostingId === host.id}
+                                className="flex-1 min-w-[80px] text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-yellow text-primary rounded shadow-sm hover:opacity-90 transition-all disabled:opacity-50"
+                              >
+                                Mark Full
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleUpdateHostingStatus(host.id, 'full')}
+                              onClick={() => handleUpdateHostingStatus(host.id, 'canceled')}
                               disabled={updatingHostingId === host.id}
-                              className="flex-1 min-w-[80px] text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-yellow text-primary rounded shadow-sm hover:opacity-90 transition-all disabled:opacity-50"
+                              className="flex-1 min-w-[70px] text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-coral text-white rounded shadow-sm hover:opacity-90 transition-all disabled:opacity-50"
                             >
-                              Mark Full
+                              Cancel
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleUpdateHostingStatus(host.id, 'canceled')}
-                            disabled={updatingHostingId === host.id}
-                            className="flex-1 min-w-[70px] text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-coral text-white rounded shadow-sm hover:opacity-90 transition-all disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
+                            <Link 
+                              href={`/trip/${trip.id}/meetup/${host.id}`}
+                              className="flex-1 min-w-[70px] text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-blue text-white rounded shadow-sm hover:opacity-90 transition-all flex items-center justify-center"
+                            >
+                              Manage
+                            </Link>
+                          </div>
+                        ) : (
                           <Link 
                             href={`/trip/${trip.id}/meetup/${host.id}`}
-                            className="flex-1 min-w-[70px] text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-blue text-white rounded shadow-sm hover:opacity-90 transition-all flex items-center justify-center"
+                            className="w-full md:w-auto text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-blue text-white rounded shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2"
                           >
-                            Manage
+                            <Users className="w-3.5 h-3.5 shrink-0" /> View Meetup
                           </Link>
-                        </div>
-                      ) : (
-                        <Link 
-                          href={`/trip/${trip.id}/meetup/${host.id}`}
-                          className="w-full md:w-auto text-center px-2 py-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wide border border-border-dark/15 bg-accent-blue text-white rounded shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2"
-                        >
-                          <Users className="w-3.5 h-3.5 shrink-0" /> View Meetup
-                        </Link>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
