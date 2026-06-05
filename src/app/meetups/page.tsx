@@ -66,10 +66,13 @@ export default async function MeetupsPage({ searchParams }: { searchParams?: { s
 
   // Helper helper to check active boost duration (Option 2: 7-day limit or target_date)
   const isBoostActive = (hosting: any) => {
-    if (!hosting.is_boosted || hosting.boost_status !== 'approved' || !hosting.boosted_at) {
+    if (!hosting.is_boosted || hosting.boost_status !== 'approved') {
       return false;
     }
-    const boostedDate = new Date(hosting.boosted_at).getTime();
+    const boostStart = hosting.boosted_at || hosting.created_at;
+    if (!boostStart) return false;
+
+    const boostedDate = new Date(boostStart).getTime();
     const eventDate = new Date(hosting.target_date).getTime();
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
@@ -79,10 +82,13 @@ export default async function MeetupsPage({ searchParams }: { searchParams?: { s
 
   // Helper to calculate boost time remaining
   const getBoostTimeLeft = (hosting: any) => {
-    if (!hosting.is_boosted || hosting.boost_status !== 'approved' || !hosting.boosted_at) {
+    if (!hosting.is_boosted || hosting.boost_status !== 'approved') {
       return null;
     }
-    const boostedDate = new Date(hosting.boosted_at).getTime();
+    const boostStart = hosting.boosted_at || hosting.created_at;
+    if (!boostStart) return null;
+
+    const boostedDate = new Date(boostStart).getTime();
     const eventDate = new Date(hosting.target_date).getTime();
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;

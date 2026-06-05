@@ -70,10 +70,13 @@ export default function MeetupPageView({
   }, [isHost, currentUserId, supabase]);
 
   const isBoostActive = (h: any) => {
-    if (!h.is_boosted || h.boost_status !== 'approved' || !h.boosted_at) {
+    if (!h.is_boosted || h.boost_status !== 'approved') {
       return false;
     }
-    const boostedDate = new Date(h.boosted_at).getTime();
+    const boostStart = h.boosted_at || h.created_at;
+    if (!boostStart) return false;
+
+    const boostedDate = new Date(boostStart).getTime();
     const eventDate = new Date(h.target_date).getTime();
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
@@ -82,10 +85,13 @@ export default function MeetupPageView({
   };
 
   const getBoostTimeLeft = (h: any) => {
-    if (!h.is_boosted || h.boost_status !== 'approved' || !h.boosted_at) {
+    if (!h.is_boosted || h.boost_status !== 'approved') {
       return null;
     }
-    const boostedDate = new Date(h.boosted_at).getTime();
+    const boostStart = h.boosted_at || h.created_at;
+    if (!boostStart) return null;
+
+    const boostedDate = new Date(boostStart).getTime();
     const eventDate = new Date(h.target_date).getTime();
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;

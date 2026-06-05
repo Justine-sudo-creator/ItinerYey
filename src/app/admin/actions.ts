@@ -278,6 +278,7 @@ export async function approveBoost(hostingId: string) {
 
   revalidatePath('/admin');
   revalidatePath('/'); // Revalidate feed to show boosted styling
+  revalidatePath('/meetups'); // Revalidate meetups list page
   return { success: true };
 }
 
@@ -293,6 +294,7 @@ export async function rejectBoost(hostingId: string) {
   if (error) throw new Error('Failed to reject boost: ' + error.message);
 
   revalidatePath('/admin');
+  revalidatePath('/meetups'); // Revalidate meetups list page
   return { success: true };
 }
 
