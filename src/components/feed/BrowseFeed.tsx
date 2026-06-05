@@ -450,9 +450,9 @@ export function BrowseFeed() {
     <div className="w-full flex flex-col gap-6">
       
       {/* 2-Column Section: Active Challenge (Left) & Leaderboard Widget (Right) */}
-      <div className="grid grid-cols-12 gap-3 w-full">
-        {/* Left Column: Bulletin Board */}
-        <div className="col-span-7 md:col-span-8 flex">
+      <div className="flex flex-col md:grid md:grid-cols-12 gap-3 w-full">
+        {/* Column: Bulletin Board (Full-width on mobile, 7/12 cols on desktop) */}
+        <div className="w-full md:col-span-8 flex">
           {activeChallenge ? (() => {
             const hashtagRaw = activeChallenge.hashtag || '';
             let type = 'Challenge';
@@ -523,15 +523,15 @@ export function BrowseFeed() {
             const style = NOTE_STYLES[type] || NOTE_STYLES[type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()] || NOTE_STYLES.General;
 
             return (
-              <div className="w-full bg-[#E5D3C3] border-4 border-[#785942] rounded-lg p-2 md:p-3 shadow-hard relative flex gap-3 h-[210px] md:h-[240px] overflow-hidden bg-[radial-gradient(#cbb09c_2px,transparent_2px)] [background-size:16px_16px]">
+              <div className="w-full bg-[#E5D3C3] border-4 border-[#785942] rounded-lg p-2 md:p-3 shadow-hard relative flex gap-2 sm:gap-3 h-[210px] md:h-[240px] overflow-hidden bg-[radial-gradient(#cbb09c_2px,transparent_2px)] [background-size:16px_16px]">
                 {/* Pinned Sticky Note */}
-                <div className={`flex-grow flex flex-col justify-between p-3 md:p-4 shadow-md border border-black/10 rotate-[-1.5deg] relative transition-transform hover:rotate-0 duration-200 ${style.bg}`}>
+                <div className={`flex-1 flex flex-col justify-between p-3 md:p-4 shadow-md border border-black/10 rotate-[-1.5deg] relative transition-transform hover:rotate-0 duration-200 ${style.bg}`}>
                   {/* Pushpin at the top center */}
                   <div className="absolute top-[-8px] left-1/2 -translate-x-1/2 z-20 text-sm md:text-lg drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.35)] select-none">
                     📌
                   </div>
                   
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pr-[72px] sm:pr-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={`text-[7px] md:text-[9px] font-black tracking-widest uppercase border border-black/10 rounded px-1.5 py-0.5 shadow-sm ${style.badgeBg}`}>
                         {style.icon} {style.label}
@@ -550,7 +550,7 @@ export function BrowseFeed() {
                     <h2 className="font-display font-black text-xs md:text-base lg:text-lg text-primary tracking-tight leading-tight mt-1.5 line-clamp-1">
                       {activeChallenge.title}
                     </h2>
-                    <p className={`text-[9px] md:text-xs font-bold leading-snug mt-1 line-clamp-2 md:line-clamp-3 ${style.text}`}>
+                    <p className={`text-[9px] md:text-xs font-bold leading-snug mt-1 line-clamp-3 ${style.text}`}>
                       {activeChallenge.description}
                     </p>
                   </div>
@@ -594,10 +594,10 @@ export function BrowseFeed() {
                   </div>
                 </div>
 
-                {/* Optional Polaroid Photo */}
+                {/* Optional Polaroid Photo - Styled to never overlap text on mobile */}
                 {polaroidUrl && (
-                  <div className="absolute right-3 top-3 sm:static flex flex-col bg-white border border-black/10 p-1.5 pb-3 shadow-md rotate-[4deg] sm:rotate-[2deg] hover:rotate-0 duration-200 transition-transform w-[70px] md:w-[100px] shrink-0 sm:self-center z-10">
-                    <div className="absolute top-[-6px] left-1/2 -translate-x-1/2 z-20 text-[10px] md:text-sm drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.3)] select-none">
+                  <div className="absolute right-2.5 top-3 sm:static flex flex-col bg-white border border-black/10 p-1 md:p-1.5 pb-2 md:pb-3 shadow-md rotate-[3deg] hover:rotate-0 duration-200 transition-transform w-[68px] md:w-[100px] shrink-0 self-center z-10">
+                    <div className="absolute top-[-6px] left-1/2 -translate-x-1/2 z-20 text-[8px] md:text-sm drop-shadow-[0_1.5px_1.5px_rgba(0,0,0,0.3)] select-none">
                       📍
                     </div>
                     <div className="w-full aspect-square relative bg-[#1E1E1E] overflow-hidden border border-black/5">
@@ -622,9 +622,9 @@ export function BrowseFeed() {
           )}
         </div>
 
-        {/* Right Column: Scrollable Leaderboard Widget */}
-        <div className="col-span-5 md:col-span-4 flex flex-col">
-          <div className="w-full bg-surface border border-border-dark/15 rounded-lg overflow-hidden shadow-sm flex flex-col h-[210px] md:h-[240px]">
+        {/* Scrollable Leaderboard Widget (Full-width on mobile, 5/12 cols on desktop) */}
+        <div className="w-full md:col-span-4 flex flex-col">
+          <div className="w-full bg-surface border border-border-dark/15 rounded-lg overflow-hidden shadow-sm flex flex-col h-[162px] md:h-[240px]">
             <div className="bg-primary text-white p-2 flex items-center justify-between border-b border-border-dark/15 shrink-0">
               <span className="font-display font-black text-[9px] md:text-xs uppercase tracking-wider">
                 Leaderboard
@@ -678,8 +678,8 @@ export function BrowseFeed() {
                       </div>
                       
                       <div className="shrink-0">
-                        <span className="inline-block px-1.5 py-0.5 bg-accent-coral border border-border-dark/15 rounded text-white text-[9px] md:text-[10px] shadow-sm">
-                          ★ {user.total_vouches}
+                        <span className="text-[9px] md:text-[10px] font-black text-secondary">
+                          {user.total_vouches} vouches
                         </span>
                       </div>
                     </div>
@@ -690,6 +690,8 @@ export function BrowseFeed() {
           </div>
         </div>
       </div>
+
+
 
       {/* Search Bar & Controls */}
       <div className="flex flex-row items-stretch gap-2 w-full">

@@ -41,8 +41,7 @@ export default function SubmitContainer({ userProfile, isAdmin = false }: Submit
       <div className="mb-6">
         <SectionHeader title="Share something useful" />
         <p className="text-secondary font-medium text-sm mt-2">
-          Add a real trip, local tip, or update to help other travelers plan better. 
-          This will unlock the full board!
+          Add your own trip to suggest a budget-friendly gala, or local tip to help others plan better.
         </p>
       </div>
 

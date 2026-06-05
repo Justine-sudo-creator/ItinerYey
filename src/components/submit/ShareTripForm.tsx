@@ -10,6 +10,8 @@ import { TextInput, TextAreaInput, SelectInput, Label } from '@/components/ui/In
 import { PrimaryButton, SecondaryButton } from '@/components/ui/Button';
 import { TRIP_TYPES, TRAVEL_STYLES } from '@/lib/constants';
 import { User, Trip, TripStop, TripPhoto, TripDay } from '@/types/supabase';
+import { Award } from 'lucide-react';
+
 
 type ShareTripFormProps = {
   returnTo: string;
@@ -161,6 +163,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
   const [showAdvancedRoute, setShowAdvancedRoute] = useState(false);
   const [showHumanLayer, setShowHumanLayer] = useState(isEdit);
   const [isPublic, setIsPublic] = useState(initialData?.is_public !== undefined ? !!initialData.is_public : true);
+  const [isSnapshot, setIsSnapshot] = useState(initialData?.submission_tier === 'basic' || false);
 
   // Auto-Save Draft to LocalStorage (for create mode only)
   React.useEffect(() => {
@@ -200,6 +203,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         if (draft.days) setDays(draft.days);
         if (draft.showItinerary !== undefined) setShowItinerary(draft.showItinerary);
         if (draft.isPublic !== undefined) setIsPublic(draft.isPublic);
+        if (draft.isSnapshot !== undefined) setIsSnapshot(draft.isSnapshot);
       }
     } catch (e) {
       console.error('Failed to load draft from localStorage', e);
@@ -240,7 +244,8 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         honestWarning,
         days,
         showItinerary,
-        isPublic
+        isPublic,
+        isSnapshot
       };
       localStorage.setItem('itineryey_new_trip_draft', JSON.stringify(draftData));
     } catch (e) {
@@ -250,7 +255,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
     travelDate, groupSize, costScope, tripType, durationDays, tripDurationLabel, isDetailedCost,
     transportCost, foodCost, activitiesCost, accommodationCost, detailedCosts,
     targetBudget, showCategoryEstimates, summary, tip, travelStyle, honestWarning,
-    days, showItinerary, isPublic
+    days, showItinerary, isPublic, isSnapshot
   ]);
 
   const clearDraft = () => {
@@ -313,6 +318,87 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
     }));
   };
 
+  // Helper to check if a location matches a key destination
+  const getDestinationBaseline = (dest: string): number => {
+    const d = dest.toLowerCase();
+    if (d.includes('tagaytay')) return 2500;
+    if (d.includes('union') || d.includes('elyu') || d.includes('san juan')) return 5000;
+    if (d.includes('baguio')) return 4500;
+    if (d.includes('bgc') || d.includes('bonifacio') || d.includes('manila') || d.includes('makati') || d.includes('ortigas') || d.includes('pasay')) return 1200;
+    
+    // Check if international
+    if (destStructured?.country && destStructured.country !== 'Philippines') {
+      return 7000;
+    }
+    return 2000; // General domestic fallback
+  };
+
+  const getMatipidScore = (): { percentage: number; isWais: boolean; baseline: number } => {
+    const baseline = getDestinationBaseline(destination);
+    const days = parseInt(durationDays) || 1;
+    const cost = parseInt(targetBudget) || detailedCosts.reduce((sum, c) => sum + (parseInt(c.amount) || 0), 0);
+    
+    let totalCost = cost;
+    // If it's group scope, divide by group size to compare per-head
+    if (costScope === 'group_total') {
+      const size = parseInt(groupSize) || 1;
+      totalCost = cost / size;
+    }
+    
+    const dailyCost = totalCost / days;
+    
+    if (dailyCost < baseline) {
+      const diff = baseline - dailyCost;
+      const pct = Math.round((diff / baseline) * 100);
+      return { percentage: pct, isWais: true, baseline };
+    }
+    return { percentage: 0, isWais: false, baseline };
+  };
+
+  const fillDevMockData = () => {
+    setTripName('Tagaytay Quick Snapshot');
+    setDestination('Tagaytay');
+    setDestinationRegion('Calabarzon');
+    setDestStructured({
+      place_id: 'mock-tagaytay',
+      lat: 14.1153,
+      lng: 120.9621,
+      city: 'Tagaytay',
+      province: 'Cavite',
+      country: 'Philippines'
+    });
+    setOriginRegion('Metro Manila');
+    setOrigStructured({
+      place_id: 'mock-manila',
+      lat: 14.5995,
+      lng: 120.9842,
+      city: 'Manila',
+      province: 'Metro Manila',
+      country: 'Philippines'
+    });
+    setTravelDate('2026-06-01');
+    setGroupSize('2');
+    setCostScope('individual');
+    setTripType('Road Trip');
+    setDurationDays('1');
+    setTripDurationLabel('Whole day');
+    setIsSnapshot(true);
+    setTargetBudget('1200');
+    setSummary('Quick Tagaytay bulalo roadtrip under budget!');
+    setTip('Eat at Maharlika Highway stalls for cheaper bulalo.');
+    setHonestWarning('Traffic going back on Sunday afternoon is terrible.');
+    setPhotos([
+      {
+        id: 'mock-photo-1',
+        previewUrl: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=600&q=80',
+        caption: 'Bulalo view',
+        isHero: true,
+        isExisting: false,
+        file: new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'mock.jpg', { type: 'image/jpeg' }) // Valid non-empty dummy byte array File
+      }
+    ]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -323,13 +409,17 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
       if (!destination || !destinationRegion || !originRegion || !travelDate || !groupSize || !tripType || !durationDays) {
         return setError('Please fill out all required Basics fields.');
       }
-      if (!isEdit && photos.length < 3) {
-        return setError('Please upload at least 3 photos.');
+      
+      const minPhotosRequired = isSnapshot ? 1 : 3;
+      if (!isEdit && photos.length < minPhotosRequired) {
+        return setError(`Please upload at least ${minPhotosRequired} photo${minPhotosRequired > 1 ? 's' : ''}.`);
       }
 
       // Cost validation
       let totalInputCost = 0;
-      if (isDetailedCost) {
+      if (isSnapshot) {
+        totalInputCost = parseInt(targetBudget) || 0;
+      } else if (isDetailedCost) {
         totalInputCost = detailedCosts.reduce((sum, c) => sum + (parseInt(c.amount) || 0), 0);
       } else {
         totalInputCost = (parseInt(transportCost) || 0) + (parseInt(foodCost) || 0) + (parseInt(activitiesCost) || 0) + (parseInt(accommodationCost) || 0);
@@ -361,14 +451,18 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
 
       // Determine submission tier
       const hasRouteBasis = !!(originAreaState || routeContextInput.trim() || (isDetailedCost && detailedCosts.some(c => c.category === 'Transport' && (parseInt(c.amount) || 0) > 0)));
-      const hasCostBreakdown = isDetailedCost;
-      const itineraryBlocksCount = days.reduce((acc, d) => acc + d.blocks.filter(b => b.activity.trim() !== '').length, 0);
-      const submissionTier = isPublic
-        ? ((tripDurationLabel && hasRouteBasis && hasCostBreakdown && (itineraryBlocksCount >= 2 || tripStops.filter(s => s.name.trim()).length >= 2)) ? 'full' : 'basic')
-        : 'draft';
+      const hasCostBreakdown = isDetailedCost && !isSnapshot;
+      const itineraryBlocksCount = isSnapshot ? 0 : days.reduce((acc, d) => acc + d.blocks.filter(b => b.activity.trim() !== '').length, 0);
+      const submissionTier = isSnapshot
+        ? 'basic'
+        : (isPublic
+          ? ((tripDurationLabel && hasRouteBasis && hasCostBreakdown && (itineraryBlocksCount >= 2 || tripStops.filter(s => s.name.trim()).length >= 2)) ? 'full' : 'basic')
+          : 'draft');
 
       let tCost = 0, fCost = 0, aCost = 0, accCost = 0;
-      if (isDetailedCost) {
+      if (isSnapshot) {
+        // No splits in snapshot, total is targetBudget
+      } else if (isDetailedCost) {
         detailedCosts.forEach(c => {
           const amt = parseInt(c.amount) || 0;
           if (c.category === 'Transport') tCost += amt;
@@ -384,9 +478,11 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
       }
       
       const sumOfCosts = tCost + fCost + aCost + accCost;
-      const calculatedTotalCost = (!isPublic && !showCategoryEstimates && targetBudget) 
-         ? parseInt(targetBudget) || 0 
-         : sumOfCosts;
+      const calculatedTotalCost = isSnapshot
+        ? parseInt(targetBudget) || 0
+        : ((!isPublic && !showCategoryEstimates && targetBudget) 
+          ? parseInt(targetBudget) || 0 
+          : sumOfCosts);
 
       let finalOriginArea = originAreaState || null;
       let finalRouteContext = null;
@@ -436,7 +532,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         food_cost: fCost,
         activities_cost: aCost,
         accommodation_cost: accCost,
-        detailed_costs: isDetailedCost ? detailedCosts : null,
+        detailed_costs: (isDetailedCost && !isSnapshot) ? detailedCosts : null,
         cost_scope: costScope,
         tip: tip || null,
         honest_warning: honestWarning || null,
@@ -479,6 +575,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               console.error('Failed to update existing photo:', updateError);
             }
           } else if (p.file) {
+            // Check if mock file from Dev Auto-Fill to skip upload or upload mock
             const publicUrl = await uploadTripPhoto(user.id, initialData.id!, p.file);
             await supabase.from('trip_photos').insert({
               trip_id: initialData.id!,
@@ -491,7 +588,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         }
 
         // Prepare stops payload
-        const stopsPayload = tripStops.filter(s => s.name.trim() !== '').map((s, i) => ({
+        const stopsPayload = isSnapshot ? [] : tripStops.filter(s => s.name.trim() !== '').map((s, i) => ({
           stop_name: s.name.trim(),
           stop_note: s.note.trim() || null,
           display_order: i
@@ -499,7 +596,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
 
         // Prepare days payload
         const daysPayload: Omit<TripDay, 'id' | 'trip_id'>[] = [];
-        if (itineraryBlocksCount > 0) {
+        if (!isSnapshot && itineraryBlocksCount > 0) {
           for (let i = 0; i < days.length; i++) {
             const d = days[i];
             for (let bIdx = 0; bIdx < d.blocks.length; bIdx++) {
@@ -565,7 +662,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
       }
 
       // 2.5 Insert Trip Stops
-      if (tripStops.length > 0) {
+      if (!isSnapshot && tripStops.length > 0) {
         for (let i = 0; i < tripStops.length; i++) {
           const s = tripStops[i];
           if (s.name.trim() === '') continue;
@@ -583,7 +680,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
       }
 
       // 3. Insert Itinerary Days
-      if (itineraryBlocksCount > 0) {
+      if (!isSnapshot && itineraryBlocksCount > 0) {
         for (let i = 0; i < days.length; i++) {
           const d = days[i];
           for (let bIdx = 0; bIdx < d.blocks.length; bIdx++) {
@@ -629,59 +726,93 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
   };
 
   if (isSuccess) {
+    const matipid = getMatipidScore();
     return (
       <div className="bg-surface border border-border-dark/15 rounded-lg p-8 shadow-sm text-center flex flex-col items-center justify-center min-h-[40vh]">
         {/* Header */}
         <div className="mb-6">
           <h2 className="text-3xl font-black uppercase tracking-tight">
-            {isPublic ? (isEdit ? 'Edit Trip' : 'Share Your Trip') : (isEdit ? 'Edit Draft' : 'Save Private Draft')}
+            {isPublic ? (isEdit ? 'Edit Trip' : 'Yey!') : (isEdit ? 'Edit Draft' : 'Save Private Draft')}
           </h2>
           <p className="text-secondary font-medium mt-1">
             {isPublic 
-              ? (isEdit ? 'Update your submitted byahe. Major edits may need review again.' : 'Help others by sharing real trip budgets and itineraries. We manually review submissions.')
+              ? (isEdit ? 'Update your submitted byahe. Major edits may need review again.' : 'Your trip is currently pending admin approval and will appear on the public feed shortly.')
               : 'Your private trip planner. Keep it here or publish it to the community later.'}
           </p>
         </div>
         <h2 className="font-brand font-black text-3xl mb-4 text-accent-green">
           {isPublic ? 'Trip Submitted!' : 'Draft Saved!'}
         </h2>
+        
+        {/* Matipid Score Section */}
+        {isPublic && matipid.isWais && (
+          <div className="mb-6 p-4 bg-accent-yellow/15 border-2 border-dashed border-accent-yellow rounded-lg max-w-md flex flex-col items-center gap-2">
+            <Award className="w-8 h-8 text-accent-coral" />
+            <h4 className="text-lg font-black text-accent-coral uppercase tracking-tight">Wais Traveler Unlocked!</h4>
+            <p className="text-sm font-bold mt-1">
+              Your daily spend is <span className="text-accent-coral text-base font-black">{matipid.percentage}% cheaper</span> than the average baseline daily spend of ₱{matipid.baseline.toLocaleString()} for this destination!
+            </p>
+          </div>
+        )}
+
+
         <p className="text-lg font-bold mb-2">
-          {isPublic ? 'Your itinerary was successfully saved.' : 'Your plan has been saved to your Locker.'}
+          {isPublic ? 'Your travel map has been updated with your new destination province.' : 'Your plan has been saved to your Locker.'}
         </p>
         <p className="mb-6 max-w-md opacity-80 leading-relaxed text-sm">
           {isPublic ? (
-            <>It is currently pending admin approval and will appear on the public feed shortly. Your travel map has been updated with your new destination province! Full access to ItinerYey is now unlocked.</>
+            <>Keep submitting trips to fill your map and gain bragging rights for how many places you've been!</>
           ) : (
             <>This trip is 100% private to you in your Locker. You can view, edit, or publish it to the community feed whenever you are ready.</>
-          )}
+          )
+          }
         </p>
-        <div className="flex gap-4">
-          <PrimaryButton onClick={() => router.push(isPublic ? '/profile' : (returnTo || '/'))}>
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs sm:max-w-md mt-2">
+          <PrimaryButton 
+            onClick={() => router.push(isPublic ? '/profile' : (returnTo || '/'))}
+            className="w-full text-center flex items-center justify-center py-3"
+          >
             {isPublic ? 'View My Map' : 'Return to Locker'}
           </PrimaryButton>
-          <SecondaryButton onClick={() => router.push('/')}>
+          <SecondaryButton 
+            onClick={() => router.push('/')}
+            className="w-full text-center flex items-center justify-center py-3"
+          >
             Go to Feed
           </SecondaryButton>
         </div>
+
       </div>
     );
   }
 
   // Helper statuses for guidelines completion
   const isBasicsCompleted = !!(destination && destinationRegion && originRegion && travelDate && groupSize && tripType && durationDays);
-  const isPhotosCompleted = isEdit || photos.length >= 3;
-  const isCostsCompleted = isDetailedCost 
-    ? detailedCosts.some(c => (parseInt(c.amount) || 0) > 0)
-    : ((parseInt(transportCost) || 0) > 0 || (parseInt(foodCost) || 0) > 0 || (parseInt(activitiesCost) || 0) > 0 || (parseInt(accommodationCost) || 0) > 0);
+  const isPhotosCompleted = isEdit || photos.length >= (isSnapshot ? 1 : 3);
+  const isCostsCompleted = isSnapshot
+    ? (parseInt(targetBudget) || 0) > 0
+    : (isDetailedCost 
+      ? detailedCosts.some(c => (parseInt(c.amount) || 0) > 0)
+      : ((parseInt(transportCost) || 0) > 0 || (parseInt(foodCost) || 0) > 0 || (parseInt(activitiesCost) || 0) > 0 || (parseInt(accommodationCost) || 0) > 0));
   const isSubmissionCompleted = isPublic
     ? (isBasicsCompleted && isPhotosCompleted && isCostsCompleted)
     : !!destination;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
-      {/* Privacy Mode Selector */}
-      <div className="flex flex-col gap-2 bg-surface p-3 border border-border-dark/15 rounded-lg shadow-sm">
-        <label className="flex items-center gap-3 cursor-pointer select-none">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6 relative">
+      {/* Dev Auto-Fill Helper Button (Dev/Admin only, but exposed absolutely here for ease of testing) */}
+      <button 
+        type="button" 
+        onClick={fillDevMockData}
+        className="absolute top-[-48px] right-0 bg-accent-coral border-2 border-border-dark text-white font-black text-xs px-3 py-1.5 rounded-md hover:bg-accent-coral/95 transition-all shadow-[4px_4px_0px_#1E1E1E] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_#1E1E1E]"
+      >
+        ⚡ Dev Auto-Fill (Tagaytay)
+      </button>
+
+      {/* Consolidated Publishing & Submission Format Panel */}
+      <div className="flex flex-col gap-4 bg-surface p-4 border border-border-dark/15 rounded-lg shadow-sm">
+        {/* Toggle 1: Publish Checkbox */}
+        <label className="flex items-center gap-3 cursor-pointer select-none border-b border-border-dark/10 pb-3">
           <input 
             type="checkbox" 
             checked={isPublic}
@@ -693,12 +824,51 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
           </span>
         </label>
         
-        {!isPublic && (
-          <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-md p-2 text-xs font-bold text-primary mt-1">
-            Draft Mode: Just enter a destination to save a private draft.
+        {!isPublic ? (
+          <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-md p-3 text-xs font-bold text-primary">
+            🔒 Draft Mode: Just enter a destination to save a private planner draft in your Locker.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <span className="font-bold text-xs uppercase tracking-wider text-secondary">Submission Format</span>
+            
+            <div className="flex flex-col gap-3">
+              {/* Option A: Quick Snapshot */}
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="submissionTier"
+                  checked={isSnapshot}
+                  onChange={() => setIsSnapshot(true)}
+                  className="w-4 h-4 mt-1 accent-primary border border-border-dark/15 cursor-pointer flex-shrink-0"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-primary">
+                    Quick Snapshot <span className="text-xs font-normal text-secondary">(Fastest way to contribute. You can always edit this trip later to add details.)</span>
+                  </span>
+                </div>
+              </label>
+
+              {/* Option B: Detailed Guide */}
+              <label className="flex items-start gap-3 cursor-pointer select-none border-t border-border-dark/10 pt-3">
+                <input
+                  type="radio"
+                  name="submissionTier"
+                  checked={!isSnapshot}
+                  onChange={() => setIsSnapshot(false)}
+                  className="w-4 h-4 mt-1 accent-primary border border-border-dark/15 cursor-pointer flex-shrink-0"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-primary">
+                    Detailed Guide <span className="text-xs font-normal text-secondary">(Help other travelers fully copy your trip by adding cost breakdowns, itinerary, specific stops, and notes.)</span>
+                  </span>
+                </div>
+              </label>
+            </div>
           </div>
         )}
       </div>
+
 
       {/* SECTION 1 */}
       <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
@@ -722,47 +892,52 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               setDestStructured(struct);
             }}
           />
-          <div className="flex flex-col gap-2 border border-border-dark/15 rounded-lg p-4 bg-white/50">
-            <Label>{isPublic ? 'Places Visited / Stops' : 'Places to Visit / Stops'} (Optional)</Label>
-            <p className="text-xs text-secondary italic">
-              {isPublic ? 'Add specific restaurants, cafes, malls, parks, or attractions you visited. This helps others copy your trip.' : 'Add specific restaurants, cafes, malls, parks, or attractions you want to visit.'}
-            </p>
-            
-            {tripStops.map((s) => (
-              <div key={s.id} className="relative border-b-2 border-border-dark pb-3 mb-2 pr-10">
-                <button 
-                  type="button" 
-                  onClick={() => removeTripStop(s.id)}
-                  className="absolute right-0 bottom-3 bg-accent-coral text-white font-bold w-8 h-[42px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-sm"
-                  aria-label="Remove stop"
-                >
-                  X
-                </button>
-                <div className="grid grid-cols-2 gap-2">
-                  <TextInput 
-                    label="Stop Name" 
-                    placeholder="e.g. Market Market" 
-                    value={s.name} 
-                    onChange={e => updateTripStop(s.id, 'name', e.target.value)}
-                  />
-                  <TextInput 
-                    label="Note (Optional)" 
-                    placeholder="e.g. Best place for dinner" 
-                    value={s.note} 
-                    onChange={e => updateTripStop(s.id, 'note', e.target.value)}
-                  />
+          
+          {/* Hide Stops in Quick Snapshot Mode */}
+          {!isSnapshot && (
+            <div className="flex flex-col gap-2 border border-border-dark/15 rounded-lg p-4 bg-white/50 animate-in fade-in">
+              <Label>{isPublic ? 'Places Visited / Stops' : 'Places to Visit / Stops'} (Optional)</Label>
+              <p className="text-xs text-secondary italic">
+                {isPublic ? 'Add specific restaurants, cafes, malls, parks, or attractions you visited. This helps others copy your trip.' : 'Add specific restaurants, cafes, malls, parks, or attractions you want to visit.'}
+              </p>
+              
+              {tripStops.map((s) => (
+                <div key={s.id} className="relative border-b-2 border-border-dark pb-3 mb-2 pr-10">
+                  <button 
+                    type="button" 
+                    onClick={() => removeTripStop(s.id)}
+                    className="absolute right-0 bottom-3 bg-accent-coral text-white font-bold w-8 h-[42px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-sm"
+                    aria-label="Remove stop"
+                  >
+                    X
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextInput 
+                      label="Stop Name" 
+                      placeholder="e.g. Market Market" 
+                      value={s.name} 
+                      onChange={e => updateTripStop(s.id, 'name', e.target.value)}
+                    />
+                    <TextInput 
+                      label="Note (Optional)" 
+                      placeholder="e.g. Best place for dinner" 
+                      value={s.note} 
+                      onChange={e => updateTripStop(s.id, 'note', e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-            
-            <button 
-              type="button" 
-              onClick={addTripStop}
-              className="mt-2 py-2 px-4 bg-accent-blue text-white border border-border-dark/15 rounded-md shadow-sm font-bold text-sm self-start hover:-translate-y-0.5 active:translate-y-0 transition-all"
-            >
-              + Add Stop
-            </button>
-          </div>
+              ))}
+              
+              <button 
+                type="button" 
+                onClick={addTripStop}
+                className="mt-2 py-2 px-4 bg-accent-blue text-white border border-border-dark/15 rounded-md shadow-sm font-bold text-sm self-start hover:-translate-y-0.5 active:translate-y-0 transition-all"
+              >
+                + Add Stop
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div className="flex flex-col gap-1 col-span-2">
               <LocationAutocomplete
@@ -777,7 +952,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                        setOriginAreaState(v.replace(`, ${broad}`, '').replace(broad, '').replace(/^,\s*/, '').trim()); 
                      }
                   } else {
-                    setOriginRegion(v);
+                     setOriginRegion(v);
                   }
                   setOrigStructured(struct);
                 }}
@@ -786,22 +961,25 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               <p className="text-xs text-secondary">Choose the city/province you started from. Do not enter your exact home address.</p>
             </div>
             
-            <div className="flex flex-col justify-center mt-2 md:mt-0 col-span-2">
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="advancedRouteToggle"
-                  checked={showAdvancedRoute}
-                  onChange={(e) => setShowAdvancedRoute(e.target.checked)}
-                  className="w-5 h-5 accent-primary border border-border-dark/15 rounded flex-shrink-0"
-                />
-                <label htmlFor="advancedRouteToggle" className="font-bold text-sm cursor-pointer leading-tight">
-                  I want to add advanced route and duration details
-                </label>
+            {/* Hide Route details Toggle in Quick Snapshot Mode */}
+            {!isSnapshot && (
+              <div className="flex flex-col justify-center mt-2 md:mt-0 col-span-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="advancedRouteToggle"
+                    checked={showAdvancedRoute}
+                    onChange={(e) => setShowAdvancedRoute(e.target.checked)}
+                    className="w-5 h-5 accent-primary border border-border-dark/15 rounded flex-shrink-0"
+                  />
+                  <label htmlFor="advancedRouteToggle" className="font-bold text-sm cursor-pointer leading-tight">
+                    I want to add advanced route and duration details
+                  </label>
+                </div>
               </div>
-            </div>
+            )}
 
-            {showAdvancedRoute && (
+            {!isSnapshot && showAdvancedRoute && (
               <>
                 <div className="flex flex-col gap-1">
                   <TextInput
@@ -822,7 +1000,6 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                   />
                   <p className="text-xs text-secondary">Optional, but useful if you did not return to the same starting point.</p>
                 </div>
-
 
                 <div className="flex flex-col gap-1 col-span-2">
                   <TextInput
@@ -860,7 +1037,8 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               <p className="text-xs text-secondary">Estimate the actual time spent, including travel time if possible.</p>
             </div>
             
-            {showAdvancedRoute && (
+            {/* Calendar Days input only shows for Detailed when showAdvancedRoute is checked. In Snapshot, we assume it is estimated by tripDurationLabel (defaulting to 1 day) */}
+            {!isSnapshot && showAdvancedRoute && (
               <div className="flex flex-col gap-1">
                 <TextInput label={`Duration (Calendar Days) ${!isPublic ? '(Optional)' : ''}`} type="number" min="1" value={durationDays} onChange={e => setDurationDays(e.target.value)} required={isPublic} />
                 {((['1–2 hours', '2–3 hours', 'Half-day', 'Whole day', 'Night trip'].includes(tripDurationLabel) && parseInt(durationDays) > 1) || 
@@ -873,11 +1051,12 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                 )}
               </div>
             )}
+
           </div>
         </div>
       </div>
 
-      {/* SECTION 2 */}
+      {/* SECTION 2 (Costs) */}
       <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
         <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded mb-4 shadow-sm">
           {isPublic ? 'Real Costs' : 'Estimated Budget'}
@@ -918,160 +1097,171 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
           </div>
         </div>
         
-        {!isPublic && !showCategoryEstimates ? (
+        {/* If Snapshot mode, just show a single budget input */}
+        {isSnapshot ? (
           <div className="flex flex-col gap-4 animate-in fade-in">
             <TextInput 
-              label="Overall Target Budget (per person) ₱" 
+              label={costScope === 'individual' ? "Overall Budget (per person) ₱" : "Overall Budget (Group Total) ₱"}
               type="number" 
               min="0" 
               value={targetBudget} 
               onChange={e => setTargetBudget(e.target.value)} 
             />
-            <button
-              type="button"
-              onClick={() => setShowCategoryEstimates(true)}
-              className="text-sm font-bold text-secondary underline self-start hover:text-primary transition-colors"
-            >
-              [+] I want to estimate by category (Transport, Food, etc.)
-            </button>
           </div>
         ) : (
-          <div className="animate-in fade-in">
-            {!isPublic && (
+          !isPublic && !showCategoryEstimates ? (
+            <div className="flex flex-col gap-4 animate-in fade-in">
+              <TextInput 
+                label="Overall Target Budget (per person) ₱" 
+                type="number" 
+                min="0" 
+                value={targetBudget} 
+                onChange={e => setTargetBudget(e.target.value)} 
+              />
               <button
                 type="button"
-                onClick={() => setShowCategoryEstimates(false)}
-                className="text-sm font-bold text-secondary underline mb-4 hover:text-primary transition-colors block"
+                onClick={() => setShowCategoryEstimates(true)}
+                className="text-sm font-bold text-secondary underline self-start hover:text-primary transition-colors"
               >
-                [-] Just use a single target budget
+                [+] I want to estimate by category (Transport, Food, etc.)
               </button>
-            )}
-
-            <div className="flex items-center gap-2 mb-4">
-              <input 
-                type="checkbox" 
-                id="detailedCostToggle"
-                checked={isDetailedCost}
-                onChange={(e) => setIsDetailedCost(e.target.checked)}
-                className="w-5 h-5 accent-primary border border-border-dark/15 rounded"
-              />
-              <label htmlFor="detailedCostToggle" className="font-bold text-sm cursor-pointer">
-                I want to enter specific costs (e.g. Bus fare, Train, Lunch)
-              </label>
             </div>
-
-            {!isDetailedCost ? (
-          <>
-            <p className="text-xs text-secondary mb-4 italic">Breakdown does not need to match exactly if costs were shared unevenly. Select if you are entering your personal spend or the group total.</p>
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                <TextInput label="Transport cost ₱" type="number" min="0" value={transportCost} onChange={e => setTransportCost(e.target.value)} />
-                <TextInput label="Food cost ₱" type="number" min="0" value={foodCost} onChange={e => setFoodCost(e.target.value)} />
-                <TextInput label="Activities and entrance fees ₱" type="number" min="0" value={activitiesCost} onChange={e => setActivitiesCost(e.target.value)} />
-                <TextInput label="Accommodation cost ₱ (Enter 0 if day trip)" type="number" min="0" value={accommodationCost} onChange={e => setAccommodationCost(e.target.value)} />
-              </div>
-              
-              <div className="mt-4 p-4 bg-accent-blue/10 border border-accent-blue/30 rounded-md flex flex-col md:flex-row justify-between items-center gap-2">
-                <span className="font-bold text-primary">
-                  {costScope === 'individual'
-                    ? (isPublic ? 'Personal Spend:' : 'Estimated Personal Spend:')
-                    : (isPublic ? 'Group Total Spend:' : 'Estimated Group Total Spend:')}
-                </span>
-                <span className="text-2xl font-black text-accent-blue">
-                  ₱{Math.round((parseInt(transportCost) || 0) + (parseInt(foodCost) || 0) + (parseInt(activitiesCost) || 0) + (parseInt(accommodationCost) || 0)).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col gap-4 border border-border-dark/15 rounded-lg p-4 bg-white/50">
-            <p className="text-xs text-secondary mb-2 italic">List down your specific costs below. We will aggregate them into the respective categories automatically.</p>
-            
-            {detailedCosts.map((c) => (
-              <div key={c.id} className="relative border-b border-border-dark/10 pb-4 mb-3 pr-10">
-                <button 
-                  type="button" 
-                  onClick={() => removeDetailedCost(c.id)}
-                  className="absolute right-0 bottom-4 bg-accent-coral text-white font-bold w-8 h-[42px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-sm"
-                  aria-label="Remove cost item"
+          ) : (
+            <div className="animate-in fade-in">
+              {!isPublic && (
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryEstimates(false)}
+                  className="text-sm font-bold text-secondary underline mb-4 hover:text-primary transition-colors block"
                 >
-                  X
+                  [-] Just use a single target budget
                 </button>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
-                  <div className="col-span-1 md:col-span-1">
-                    <SelectInput 
-                      label="Category" 
-                      value={c.category} 
-                      onChange={e => updateDetailedCost(c.id, 'category', e.target.value)}
-                      options={[
-                        {value: 'Transport', label: 'Transport'},
-                        {value: 'Food', label: 'Food'},
-                        {value: 'Activities', label: 'Activities'},
-                        {value: 'Accommodation', label: 'Accommodation'},
-                      ]}
-                    />
+              )}
+
+              <div className="flex items-center gap-2 mb-4">
+                <input 
+                  type="checkbox" 
+                  id="detailedCostToggle"
+                  checked={isDetailedCost}
+                  onChange={(e) => setIsDetailedCost(e.target.checked)}
+                  className="w-5 h-5 accent-primary border border-border-dark/15 rounded"
+                />
+                <label htmlFor="detailedCostToggle" className="font-bold text-sm cursor-pointer">
+                  I want to enter specific costs (e.g. Bus fare, Train, Lunch)
+                </label>
+              </div>
+
+              {!isDetailedCost ? (
+                <>
+                  <p className="text-xs text-secondary mb-4 italic">Breakdown does not need to match exactly if costs were shared unevenly. Select if you are entering your personal spend or the group total.</p>
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <TextInput label="Transport cost ₱" type="number" min="0" value={transportCost} onChange={e => setTransportCost(e.target.value)} />
+                      <TextInput label="Food cost ₱" type="number" min="0" value={foodCost} onChange={e => setFoodCost(e.target.value)} />
+                      <TextInput label="Activities and entrance fees ₱" type="number" min="0" value={activitiesCost} onChange={e => setActivitiesCost(e.target.value)} />
+                      <TextInput label="Accommodation cost ₱ (Enter 0 if day trip)" type="number" min="0" value={accommodationCost} onChange={e => setAccommodationCost(e.target.value)} />
+                    </div>
+                    
+                    <div className="mt-4 p-4 bg-accent-blue/10 border border-accent-blue/30 rounded-md flex flex-col md:flex-row justify-between items-center gap-2">
+                      <span className="font-bold text-primary">
+                        {costScope === 'individual'
+                          ? (isPublic ? 'Personal Spend:' : 'Estimated Personal Spend:')
+                          : (isPublic ? 'Group Total Spend:' : 'Estimated Group Total Spend:')}
+                      </span>
+                      <span className="text-2xl font-black text-accent-blue">
+                        ₱{Math.round((parseInt(transportCost) || 0) + (parseInt(foodCost) || 0) + (parseInt(activitiesCost) || 0) + (parseInt(accommodationCost) || 0)).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="col-span-1 md:col-span-1 md:order-3">
-                    <TextInput 
-                      label="Amount ₱" 
-                      type="number"
-                      min="0"
-                      placeholder="0" 
-                      value={c.amount} 
-                      onChange={e => updateDetailedCost(c.id, 'amount', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2 md:col-span-2 md:order-2">
-                    <TextInput 
-                      label="Description" 
-                      placeholder="e.g. Bus to terminal" 
-                      value={c.label} 
-                      onChange={e => updateDetailedCost(c.id, 'label', e.target.value)}
-                    />
+                </>
+              ) : (
+                <div className="flex flex-col gap-4 border border-border-dark/15 rounded-lg p-4 bg-white/50">
+                  <p className="text-xs text-secondary mb-2 italic">List down your specific costs below. We will aggregate them into the respective categories automatically.</p>
+                  
+                  {detailedCosts.map((c) => (
+                    <div key={c.id} className="relative border-b border-border-dark/10 pb-4 mb-3 pr-10">
+                      <button 
+                        type="button" 
+                        onClick={() => removeDetailedCost(c.id)}
+                        className="absolute right-0 bottom-4 bg-accent-coral text-white font-bold w-8 h-[42px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-sm"
+                        aria-label="Remove cost item"
+                      >
+                        X
+                      </button>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
+                        <div className="col-span-1 md:col-span-1">
+                          <SelectInput 
+                            label="Category" 
+                            value={c.category} 
+                            onChange={e => updateDetailedCost(c.id, 'category', e.target.value)}
+                            options={[
+                              {value: 'Transport', label: 'Transport'},
+                              {value: 'Food', label: 'Food'},
+                              {value: 'Activities', label: 'Activities'},
+                              {value: 'Accommodation', label: 'Accommodation'},
+                            ]}
+                          />
+                        </div>
+                        <div className="col-span-1 md:col-span-1 md:order-3">
+                          <TextInput 
+                            label="Amount ₱" 
+                            type="number"
+                            min="0"
+                            placeholder="0" 
+                            value={c.amount} 
+                            onChange={e => updateDetailedCost(c.id, 'amount', e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 md:col-span-2 md:order-2">
+                          <TextInput 
+                            label="Description" 
+                            placeholder="e.g. Bus to terminal" 
+                            value={c.label} 
+                            onChange={e => updateDetailedCost(c.id, 'label', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <button 
+                    type="button" 
+                    onClick={addDetailedCost}
+                    className="mt-2 py-2 px-4 bg-accent-yellow border border-border-dark/15 rounded-md shadow-sm font-bold text-sm self-start hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                  >
+                    + Add Specific Cost
+                  </button>
+
+                  <div className="mt-4 p-4 bg-accent-blue/10 border border-accent-blue/30 rounded-md flex flex-col md:flex-row justify-between items-center gap-2">
+                    <span className="font-bold text-primary">
+                      {costScope === 'individual'
+                        ? (isPublic ? 'Personal Spend:' : 'Estimated Personal Spend:')
+                        : (isPublic ? 'Group Total Spend:' : 'Estimated Group Total Spend:')}
+                    </span>
+                    <span className="text-2xl font-black text-accent-blue">
+                      ₱{Math.round(detailedCosts.reduce((sum, c) => sum + (parseInt(c.amount) || 0), 0)).toLocaleString()}
+                    </span>
                   </div>
                 </div>
-              </div>
-            ))}
-            
-            <button 
-              type="button" 
-              onClick={addDetailedCost}
-              className="mt-2 py-2 px-4 bg-accent-yellow border border-border-dark/15 rounded-md shadow-sm font-bold text-sm self-start hover:-translate-y-0.5 active:translate-y-0 transition-all"
-            >
-              + Add Specific Cost
-            </button>
+              )}
 
-            <div className="mt-4 p-4 bg-accent-blue/10 border border-accent-blue/30 rounded-md flex flex-col md:flex-row justify-between items-center gap-2">
-              <span className="font-bold text-primary">
-                {costScope === 'individual'
-                  ? (isPublic ? 'Personal Spend:' : 'Estimated Personal Spend:')
-                  : (isPublic ? 'Group Total Spend:' : 'Estimated Group Total Spend:')}
-              </span>
-              <span className="text-2xl font-black text-accent-blue">
-                ₱{Math.round(detailedCosts.reduce((sum, c) => sum + (parseInt(c.amount) || 0), 0)).toLocaleString()}
-              </span>
+              {/* Missing Route Basis Warning */}
+              {((isDetailedCost 
+                ? detailedCosts.filter(c => c.category === 'Transport').reduce((sum, c) => sum + (parseInt(c.amount) || 0), 0)
+                : parseInt(transportCost) || 0) > 0 && !originAreaState && !endAreaState && !routeContextInput.trim() && !(isDetailedCost && detailedCosts.some(c => c.category === 'Transport' && (parseInt(c.amount) || 0) > 0))) && (
+                <div className="mt-4 p-4 bg-accent-yellow/15 border border-accent-yellow/30 rounded-md flex flex-col gap-1">
+                  <span className="font-bold text-primary">Missing Route Basis</span>
+                  <span className="text-sm font-medium text-secondary">
+                    Help others understand this fare. Add a general starting area, ending area, route context, or transport steps.
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
-        )}
-
-        {/* Missing Route Basis Warning */}
-        {((isDetailedCost 
-          ? detailedCosts.filter(c => c.category === 'Transport').reduce((sum, c) => sum + (parseInt(c.amount) || 0), 0)
-          : parseInt(transportCost) || 0) > 0 && !originAreaState && !endAreaState && !routeContextInput.trim() && !(isDetailedCost && detailedCosts.some(c => c.category === 'Transport' && (parseInt(c.amount) || 0) > 0))) && (
-          <div className="mt-4 p-4 bg-accent-yellow/15 border border-accent-yellow/30 rounded-md flex flex-col gap-1">
-            <span className="font-bold text-primary">Missing Route Basis</span>
-            <span className="text-sm font-medium text-secondary">
-              Help others understand this fare. Add a general starting area, ending area, route context, or transport steps.
-            </span>
-          </div>
-        )}
-
-
-          </div>
+          )
         )}
       </div>
 
-      {/* SECTION 3 */}
+      {/* SECTION 3 (Photos) */}
       <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
         <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded mb-4 shadow-sm">
           Photos {!isPublic && '(Optional)'}
@@ -1081,84 +1271,86 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
             Add inspiration photos, screenshots of maps, or booking references to help you plan!
           </p>
         )}
-        <PhotoUploader photos={photos} onChange={setPhotos} minPhotos={isPublic ? 3 : 0} maxPhotos={10} />
+        <PhotoUploader photos={photos} onChange={setPhotos} minPhotos={isPublic ? (isSnapshot ? 1 : 3) : 0} maxPhotos={10} />
       </div>
 
-      {/* SECTION 4 */}
+      {/* SECTION 4 (Summary, Tips, Style) */}
       {isPublic && (
-      <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
-        <div className="flex items-center justify-between cursor-pointer mb-4" onClick={() => setShowHumanLayer(!showHumanLayer)}>
-          <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm">
-            Description
-          </h3>
-          <span className="font-bold border border-border-dark/15 rounded px-2">{showHumanLayer ? '-' : '+'}</span>
-        </div>
-        
-        {showHumanLayer && (
-          <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-top-2">
-            <TextInput label="Short trip summary (Optional)" placeholder="Example: 1-day Rizal trip from QC with cheap food stops and easy commute." value={summary} onChange={e => setSummary(e.target.value)} maxLength={180} />
-            <TextAreaInput label="One tip you wish you knew before going (Optional)" placeholder="e.g. Rent a habal-habal instead of hiring a tour van — saves ₱200 per head." value={tip} onChange={e => setTip(e.target.value)} maxLength={300} />
-            <SelectInput label="Travel style (Optional)" value={travelStyle} onChange={e => setTravelStyle(e.target.value)} options={[{ value: '', label: 'Select travel style...' }, ...TRAVEL_STYLES.map(r => ({ value: r, label: r }))]} />
+        <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between cursor-pointer mb-4" onClick={() => setShowHumanLayer(!showHumanLayer)}>
+            <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm">
+              Description
+            </h3>
+            <span className="font-bold border border-border-dark/15 rounded px-2">{showHumanLayer ? '-' : '+'}</span>
           </div>
-        )}
-      </div>
+          
+          {showHumanLayer && (
+            <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-top-2">
+              <TextInput label="Short trip summary (Optional)" placeholder="Example: 1-day Rizal trip from QC with cheap food stops and easy commute." value={summary} onChange={e => setSummary(e.target.value)} maxLength={180} />
+              <TextAreaInput label="One tip you wish you knew before going (Optional)" placeholder="e.g. Rent a habal-habal instead of hiring a tour van — saves ₱200 per head." value={tip} onChange={e => setTip(e.target.value)} maxLength={300} />
+              <SelectInput label="Travel style (Optional)" value={travelStyle} onChange={e => setTravelStyle(e.target.value)} options={[{ value: '', label: 'Select travel style...' }, ...TRAVEL_STYLES.map(r => ({ value: r, label: r }))]} />
+            </div>
+          )}
+        </div>
       )}
 
-      {/* SECTION 5 */}
-      <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
-        <div className="flex items-center justify-between cursor-pointer mb-4" onClick={() => setShowItinerary(!showItinerary)}>
-          <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm">
-            {isPublic ? 'Detailed Trip Notes' : 'Planned Itinerary'}
-          </h3>
-          <span className="font-bold border border-border-dark/15 rounded px-2">{showItinerary ? '-' : '+'}</span>
-        </div>
-        
-        {showItinerary && (
-          <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-top-2">
-            <p className="text-sm font-bold text-primary bg-primary/10 p-2 border-l-4 border-primary">
-              Optional, but this helps others copy your trip.
-            </p>
-            <TextAreaInput label={isPublic ? "One thing that didn’t go as planned" : "Notes or concerns"} placeholder={isPublic ? "e.g. Don't eat at the port stalls — overpriced and slow" : "Things to watch out for..."} value={honestWarning} onChange={e => setHonestWarning(e.target.value)} />
-
-            <div className="mt-4 flex flex-col gap-6">
-              {days.map((day, idx) => (
-                <div key={day.id} className="border border-border-dark/15 rounded-lg p-3 bg-white relative shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-bold">Day {idx + 1}</h4>
-                    {days.length > 1 && (
-                      <button type="button" onClick={() => removeDay(day.id)} className="text-xs text-accent-coral font-bold underline">Remove Day</button>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-3">
-                     {day.blocks.map((block) => (
-                      <div key={block.id} className="relative w-full pr-8 pb-3 mb-2 border-b border-border-dark border-dashed">
-                        {day.blocks.length > 1 && (
-                          <button 
-                            type="button" 
-                            onClick={() => removeBlock(day.id, block.id)} 
-                            className="absolute right-0 bottom-3 bg-accent-coral text-white font-bold w-6 h-[38px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-xs"
-                            aria-label="Remove activity"
-                          >
-                            X
-                          </button>
-                        )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <TextInput placeholder="e.g. 10:00 AM" label="Time / Label" value={block.time_label} onChange={e => updateBlock(day.id, block.id, 'time_label', e.target.value)} />
-                          <TextInput placeholder="Activity..." label="Activity" value={block.activity} onChange={e => updateBlock(day.id, block.id, 'activity', e.target.value)} />
-                        </div>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => addBlock(day.id)} className="text-sm font-bold text-accent-blue underline self-start mt-2">+ Add stop/activity</button>
-                  </div>
-                </div>
-              ))}
-              <SecondaryButton type="button" onClick={addDay} className="w-fit">
-                + Add Day
-              </SecondaryButton>
-            </div>
+      {/* SECTION 5 (Detailed Trip Notes / Itinerary) - Hide in Quick Snapshot Mode */}
+      {!isSnapshot && (
+        <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm animate-in fade-in">
+          <div className="flex items-center justify-between cursor-pointer mb-4" onClick={() => setShowItinerary(!showItinerary)}>
+            <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm">
+              {isPublic ? 'Detailed Trip Notes' : 'Planned Itinerary'}
+            </h3>
+            <span className="font-bold border border-border-dark/15 rounded px-2">{showItinerary ? '-' : '+'}</span>
           </div>
-        )}
-      </div>
+          
+          {showItinerary && (
+            <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-top-2">
+              <p className="text-sm font-bold text-primary bg-primary/10 p-2 border-l-4 border-primary">
+                Optional, but this helps others copy your trip.
+              </p>
+              <TextAreaInput label={isPublic ? "One thing that didn’t go as planned" : "Notes or concerns"} placeholder={isPublic ? "e.g. Don't eat at the port stalls — overpriced and slow" : "Things to watch out for..."} value={honestWarning} onChange={e => setHonestWarning(e.target.value)} />
+
+              <div className="mt-4 flex flex-col gap-6">
+                {days.map((day, idx) => (
+                  <div key={day.id} className="border border-border-dark/15 rounded-lg p-3 bg-white relative shadow-sm">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-bold">Day {idx + 1}</h4>
+                      {days.length > 1 && (
+                        <button type="button" onClick={() => removeDay(day.id)} className="text-xs text-accent-coral font-bold underline">Remove Day</button>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-3">
+                       {day.blocks.map((block) => (
+                        <div key={block.id} className="relative w-full pr-8 pb-3 mb-2 border-b border-border-dark border-dashed">
+                          {day.blocks.length > 1 && (
+                            <button 
+                              type="button" 
+                              onClick={() => removeBlock(day.id, block.id)} 
+                              className="absolute right-0 bottom-3 bg-accent-coral text-white font-bold w-6 h-[38px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-xs"
+                              aria-label="Remove activity"
+                            >
+                              X
+                            </button>
+                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            <TextInput placeholder="e.g. 10:00 AM" label="Time / Label" value={block.time_label} onChange={e => updateBlock(day.id, block.id, 'time_label', e.target.value)} />
+                            <TextInput placeholder="Activity..." label="Activity" value={block.activity} onChange={e => updateBlock(day.id, block.id, 'activity', e.target.value)} />
+                          </div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => addBlock(day.id)} className="text-sm font-bold text-accent-blue underline self-start mt-2">+ Add stop/activity</button>
+                    </div>
+                  </div>
+                ))}
+                <SecondaryButton type="button" onClick={addDay} className="w-fit">
+                  + Add Day
+                </SecondaryButton>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Admin Curation Tools */}
       {isAdmin && (
@@ -1210,15 +1402,17 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               </li>
               {!isEdit && (
                 <li className={isPhotosCompleted ? "text-secondary line-through opacity-60 decoration-2" : "text-primary font-bold"}>
-                  <strong>Trip Photos:</strong> Upload at least <strong>3 photos</strong> to share the vibe!
+                  <strong>Trip Photos:</strong> Upload at least <strong>{isSnapshot ? '1 photo' : '3 photos'}</strong> to share the vibe!
                 </li>
               )}
               <li className={isCostsCompleted ? "text-secondary line-through opacity-60 decoration-2" : "text-primary font-bold"}>
-                <strong>Real Costs:</strong> Enter at least one transport, food, accommodation, or activity expense. Public budgets cannot be ₱0.
+                <strong>Real Costs:</strong> {isSnapshot ? 'Enter an overall budget.' : 'Enter at least one transport, food, accommodation, or activity expense.'} Public budgets cannot be ₱0.
               </li>
-              <li className="text-secondary opacity-90">
-                <strong>Summary & Tips (Optional):</strong> Adding a summary and a practical tip helps others and contributes towards the premium <strong>Full Access</strong> badge!
-              </li>
+              {!isSnapshot && (
+                <li className="text-secondary opacity-90">
+                  <strong>Summary & Tips (Optional):</strong> Adding a summary and a practical tip helps others and contributes towards the premium <strong>Full Access</strong> badge!
+                </li>
+              )}
             </ul>
           ) : (
             <p className="font-medium leading-relaxed">
@@ -1238,3 +1432,4 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
     </form>
   );
 }
+

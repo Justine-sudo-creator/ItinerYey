@@ -46,13 +46,52 @@ export default function ExportableTripCard({
   const dims = formatStyles[format];
   const colors = themeStyles[theme];
 
+  // Helper to check if a location matches a key destination
+  const getDestinationBaseline = (dest: string): number => {
+    const d = dest.toLowerCase();
+    if (d.includes('tagaytay')) return 2500;
+    if (d.includes('union') || d.includes('elyu') || d.includes('san juan')) return 5000;
+    if (d.includes('baguio')) return 4500;
+    if (d.includes('bgc') || d.includes('bonifacio') || d.includes('manila') || d.includes('makati') || d.includes('ortigas') || d.includes('pasay')) return 1200;
+    
+    // Check if international
+    if (trip.destination_country && trip.destination_country !== 'Philippines') {
+      return 7000;
+    }
+    return 2000; // General domestic fallback
+  };
+
+  const getMatipidScore = (): { percentage: number; isWais: boolean } => {
+    const baseline = getDestinationBaseline(trip.destination);
+    const days = trip.duration_days || 1;
+    const cost = trip.cost_per_person || 0;
+    
+    const dailyCost = cost / days;
+    
+    if (dailyCost < baseline) {
+      const diff = baseline - dailyCost;
+      const pct = Math.round((diff / baseline) * 100);
+      return { percentage: pct, isWais: true };
+    }
+    return { percentage: 0, isWais: false };
+  };
+
+  const matipid = getMatipidScore();
+
   // Helper for rendering the inner content based on format layout
   const renderInnerContent = () => {
     const summaryText = trip.trip_summary || `${trip.duration_days}-day trip to ${trip.destination} from ${trip.origin_region}.`;
 
     if (format === 'compact') {
       return (
-        <div className="flex h-full border-[12px] border-[#1E1E1E]">
+        <div className="flex h-full border-[12px] border-[#1E1E1E] relative">
+          {/* Wais Traveler Badge for Compact Format */}
+          {matipid.isWais && (
+            <div className="absolute top-6 right-6 z-10 bg-accent-yellow text-primary border-4 border-[#1E1E1E] px-4 py-2 font-black text-xl uppercase tracking-wider rotate-12 shadow-[4px_4px_0px_#1E1E1E]">
+              🎒 WAIS TRAVELER
+            </div>
+          )}
+
           {/* Left Side */}
           <div className="w-[45%] h-full flex flex-col border-r-[12px] border-[#1E1E1E]">
             {showHero ? (
@@ -138,7 +177,14 @@ export default function ExportableTripCard({
     const isStory = format === 'story';
     
     return (
-      <div className={`flex flex-col h-full border-[12px] border-[#1E1E1E] ${colors.bg}`}>
+      <div className={`flex flex-col h-full border-[12px] border-[#1E1E1E] ${colors.bg} relative`}>
+        {/* Wais Traveler Badge for Square / Story */}
+        {matipid.isWais && (
+          <div className="absolute top-[180px] right-[60px] z-10 bg-accent-yellow text-primary border-4 border-[#1E1E1E] px-6 py-3 font-black text-2xl uppercase tracking-wider rotate-12 shadow-[6px_6px_0px_#1E1E1E] animate-pulse">
+            🎒 WAIS TRAVELER
+          </div>
+        )}
+
         <div className={`flex-1 flex flex-col p-[60px] ${isStory ? 'p-[80px]' : ''}`}>
           
           {/* Header */}
@@ -246,6 +292,7 @@ export default function ExportableTripCard({
       </div>
     );
   };
+
 
   return (
     <div 
