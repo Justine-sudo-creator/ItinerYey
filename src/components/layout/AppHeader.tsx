@@ -254,7 +254,7 @@ export function AppHeader() {
                     setIsMenuOpen(false);
                     handleSignOut();
                   }}
-                  className="w-full text-[10px] font-black uppercase tracking-wider border-2 border-border-dark py-2 bg-accent-coral text-primary shadow-hard-sm rounded-sm text-center"
+                  className="w-full block text-xs font-black uppercase tracking-wider border-2 border-border-dark py-2 bg-accent-coral text-primary shadow-hard-sm hover:translate-y-0.5 hover:shadow-none transition-all rounded-sm text-center"
                 >
                   Sign Out
                 </button>
@@ -262,12 +262,13 @@ export function AppHeader() {
                 <Link 
                   href="/login"
                   onClick={() => setIsMenuOpen(false)}
-                  className="w-full text-[10px] font-black uppercase tracking-wider border-2 border-border-dark py-2 bg-accent-coral text-primary shadow-hard-sm rounded-sm text-center"
+                  className="w-full block text-xs font-black uppercase tracking-wider border-2 border-border-dark py-2 bg-accent-coral text-primary shadow-hard-sm hover:translate-y-0.5 hover:shadow-none transition-all rounded-sm text-center"
                 >
                   Login
                 </Link>
               )}
             </div>
+
           </div>
         </>
       )}
