@@ -51,7 +51,7 @@ export default function StopMapPicker({ stops, onChange, centerLat, centerLng, c
   const [searchResults, setSearchResults] = useState<Array<{ id: string; name: string; region: string; structured?: { lat: number | null; lng: number | null } }>>([]);
   const [searching, setSearching] = useState(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const [isMaximized, setIsMaximized] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(true);
 
   useEffect(() => {
     if (mapRef.current) {
@@ -249,14 +249,6 @@ export default function StopMapPicker({ stops, onChange, centerLat, centerLng, c
         >
           {isMaximized ? '📜' : '🗺️'}
         </button>
-        {stops.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[400]">
-            <div className="bg-white/90 backdrop-blur-sm border-2 border-border-dark rounded-xl px-5 py-3 shadow-hard text-center">
-              <p className="font-black text-sm text-primary">Click anywhere on the map</p>
-              <p className="text-xs text-secondary mt-0.5">or search above to drop a stop pin</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Stop list */}
