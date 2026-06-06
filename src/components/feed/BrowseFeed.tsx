@@ -759,20 +759,70 @@ export function BrowseFeed() {
 
       {/* Trip Feed */}
       {processedTrips.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 w-full mt-2">
-          {processedTrips.map(trip => {
-            const tripHostings = hostings.filter(h => h.trip_id === trip.id);
-            return (
-              <TripCard 
-                key={trip.id} 
-                trip={trip} 
-                heroPhoto={photos.find(p => p.trip_id === trip.id)} 
-                userId={userId}
-                hostings={tripHostings}
-              />
-            );
-          })}
-        </div>
+        <>
+          {/* 2-Column Mobile Masonry */}
+          <div className="flex gap-3 w-full mt-2 lg:hidden">
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
+              {processedTrips.filter((_, idx) => idx % 2 === 0).map(trip => (
+                <TripCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  heroPhoto={photos.find(p => p.trip_id === trip.id)} 
+                  userId={userId}
+                  hostings={hostings.filter(h => h.trip_id === trip.id)}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
+              {processedTrips.filter((_, idx) => idx % 2 === 1).map(trip => (
+                <TripCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  heroPhoto={photos.find(p => p.trip_id === trip.id)} 
+                  userId={userId}
+                  hostings={hostings.filter(h => h.trip_id === trip.id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* 3-Column Desktop Masonry */}
+          <div className="hidden lg:flex gap-6 w-full mt-2">
+            <div className="flex flex-col gap-6 flex-1 min-w-0">
+              {processedTrips.filter((_, idx) => idx % 3 === 0).map(trip => (
+                <TripCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  heroPhoto={photos.find(p => p.trip_id === trip.id)} 
+                  userId={userId}
+                  hostings={hostings.filter(h => h.trip_id === trip.id)}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col gap-6 flex-1 min-w-0">
+              {processedTrips.filter((_, idx) => idx % 3 === 1).map(trip => (
+                <TripCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  heroPhoto={photos.find(p => p.trip_id === trip.id)} 
+                  userId={userId}
+                  hostings={hostings.filter(h => h.trip_id === trip.id)}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col gap-6 flex-1 min-w-0">
+              {processedTrips.filter((_, idx) => idx % 3 === 2).map(trip => (
+                <TripCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  heroPhoto={photos.find(p => p.trip_id === trip.id)} 
+                  userId={userId}
+                  hostings={hostings.filter(h => h.trip_id === trip.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </>
       ) : (
         <div className="mt-8">
           {trips.length === 0 ? (

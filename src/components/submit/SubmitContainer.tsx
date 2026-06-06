@@ -41,7 +41,7 @@ export default function SubmitContainer({ userProfile, isAdmin = false }: Submit
       <div className="mb-6">
         <SectionHeader title="Share something useful" />
         <p className="text-secondary font-medium text-sm mt-2">
-          Add your own trip to suggest a budget-friendly gala, or local tip to help others plan better.
+          Add your own trip to suggest a budget-friendly trip, or local tip to help others plan better.
         </p>
       </div>
 

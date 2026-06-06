@@ -55,7 +55,7 @@ export function LocationAutocomplete({
   }, []);
 
   const fetchOptions = async (query: string) => {
-    if (!query || query.length < 3) {
+    if (!query || query.length < 2) {
       setOptions([]);
       return;
     }
@@ -100,12 +100,12 @@ export function LocationAutocomplete({
       clearTimeout(debounceRef.current);
     }
     
-    if (val.length < 3) {
-      fetchOptions(val);
+    if (val.length < 2) {
+      setOptions([]);
     } else {
       debounceRef.current = setTimeout(() => {
         fetchOptions(val);
-      }, 300); // 300ms debounce
+      }, 300); // 300ms debounce — same for both origin and destination
     }
   };
 
@@ -155,11 +155,8 @@ export function LocationAutocomplete({
                 {loading ? (
                    <li className="px-4 py-2 text-xs italic opacity-70">Searching Map API...</li>
                 ) : (
-                  <li
-                    className="px-4 py-2 hover:bg-accent-yellow cursor-pointer"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <span className="font-bold italic">Use custom {isOriginMode ? 'origin' : 'destination'}:</span> {value}
+                  <li className="px-4 py-2 text-xs text-secondary italic opacity-70">
+                    No results found. Try a different spelling or a more specific name.
                   </li>
                 )}
               </ul>

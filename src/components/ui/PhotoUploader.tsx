@@ -120,7 +120,7 @@ export function PhotoUploader({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Label>Photos ({photos.length} / {maxPhotos})</Label>
+        <Label>Photos ({photos.length} / {maxPhotos}) *</Label>
         <p className="text-xs text-secondary mb-2">
           Minimum {minPhotos} photos. (Max 5MB each)
         </p>
@@ -135,7 +135,7 @@ export function PhotoUploader({
             disabled={isProcessing || photos.length >= maxPhotos}
           />
           <span className="font-bold text-primary">
-            {isProcessing ? 'Processing images...' : 'Click or Drag photos here'}
+            {isProcessing ? 'Processing images...' : 'Click to add photos here'}
           </span>
         </div>
         <FieldError error={error} />

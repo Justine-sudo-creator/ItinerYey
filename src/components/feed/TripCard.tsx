@@ -48,9 +48,9 @@ export function TripCard({ trip, heroPhoto, userId, hostings = [] }: TripCardPro
   return (
     <Link 
       href={`/trip/${trip.id}`} 
-      className={`flex flex-col bg-soft-beige border rounded-lg overflow-hidden hover:-translate-y-0.5 transition-all duration-200 h-full shadow-sm hover:shadow-md ${isBoosted ? 'border-accent-yellow ring-2 ring-accent-yellow/20' : 'border-border-dark/15'}`}
+      className={`flex flex-col bg-soft-beige border rounded-lg overflow-hidden hover:-translate-y-0.5 transition-all duration-200 shadow-sm hover:shadow-md ${isBoosted ? 'border-accent-yellow ring-2 ring-accent-yellow/20' : 'border-border-dark/15'}`}
     >
-      <div className="flex flex-col flex-grow h-full w-full">
+      <div className="flex flex-col flex-grow w-full">
         {/* Photo Area */}
         <div className="relative w-full h-44 sm:h-56 border-b border-border-dark/15 overflow-hidden bg-soft-beige/20">
           {heroPhoto ? (
@@ -143,18 +143,6 @@ export function TripCard({ trip, heroPhoto, userId, hostings = [] }: TripCardPro
             <span>
               {trip.destination} · From {originName}
             </span>
-          </div>
-
-          {/* Tags */}
-          <div className="flex flex-wrap items-center gap-1 mt-1">
-            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 border border-border-dark/15 bg-white text-secondary rounded shadow-sm">
-              {trip.trip_type}
-            </span>
-            {trip.travel_style && (
-              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 border border-border-dark/15 bg-white text-secondary rounded shadow-sm">
-                {trip.travel_style}
-              </span>
-            )}
           </div>
 
           {/* Spacer */}

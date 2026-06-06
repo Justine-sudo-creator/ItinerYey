@@ -17,7 +17,7 @@ export default function Home() {
             <Badge label="COMMUNITY TRAVEL BOARD" variant="warning" className="hidden sm:inline-block ml-2" />
           </div>
           <p className="text-secondary font-medium">
-            Gusto mo bang gumala on a budget? See actual spend, routes, itineraries, and tips from fellow gala peeps.
+            Gusto mo bang gumala on a budget? See actual spend, routes, itineraries, and tips shared by our community.
           </p>
         </div>
         

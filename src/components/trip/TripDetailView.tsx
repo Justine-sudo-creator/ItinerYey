@@ -16,6 +16,25 @@ import Link from 'next/link';
 import { BadgeCheck, MapPin, Map, Mail, Users, AlertCircle, MessageCircle } from 'lucide-react';
 import PriceAuditModal from './PriceAuditModal';
 import ManageTripAudits from './ManageTripAudits';
+import dynamic from 'next/dynamic';
+
+const ByaheMap = dynamic(() => import('./ByaheMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[300px] bg-soft-beige flex items-center justify-center">
+      <span className="font-bold text-xs text-secondary uppercase tracking-wider">Loading Map Modules...</span>
+    </div>
+  )
+});
+
+const StopsPinsMap = dynamic(() => import('./StopsPinsMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[340px] bg-soft-beige/50 border-2 border-border-dark rounded-xl flex items-center justify-center">
+      <span className="font-bold text-xs text-secondary uppercase tracking-wider">Loading Stops Map...</span>
+    </div>
+  )
+});
 
 type TripDetailViewProps = {
   trip: Trip;
@@ -31,149 +50,7 @@ type TripDetailViewProps = {
   joinedHostingIds?: string[];
 };
 
-function SerpentineStop({
-  stop,
-  index,
-  totalStops,
-  cols,
-}: {
-  stop: TripStop;
-  index: number;
-  totalStops: number;
-  cols: number;
-}) {
-  const row = Math.floor(index / cols);
-  const isRowEven = row % 2 === 0;
 
-  // Alternate label placement above and below the pin
-  const labelPosition = index % 2 === 0 ? 'below' : 'above';
-
-  // Outgoing connection line to index + 1
-  const hasOutgoing = index < totalStops - 1;
-  const nextRow = Math.floor((index + 1) / cols);
-  const isNextRowDifferent = nextRow !== row;
-
-  // Incoming connection line from index - 1
-  const hasIncoming = index > 0;
-  const prevRow = Math.floor((index - 1) / cols);
-  const isPrevRowDifferent = prevRow !== row;
-
-  // Connectors align to the center of the circular head of the pin.
-  // The Pin SVG is h-12 (48px) and centered. Its circular head center is around y=16px in container,
-  // which is 8px above the container's vertical center.
-  // So we adjust lines vertically by -8px from the 50% line.
-  return (
-    <div className="relative flex flex-col items-center justify-center h-[180px] w-full">
-      {/* Incoming Line */}
-      {hasIncoming && (
-        <>
-          {!isPrevRowDifferent ? (
-            isRowEven ? (
-              // Entered from left
-              <div className="w-1/2 absolute right-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-            ) : (
-              // Entered from right
-              <div className="w-1/2 absolute left-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-            )
-          ) : (
-            isRowEven ? (
-              // Entered from top-left
-              <>
-                <div className="w-1/2 absolute right-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-                <div className="h-1/2 absolute left-0 bottom-1/2 translate-y-[-8px] border-l-2 border-dashed border-accent-blue/40 -z-0" />
-              </>
-            ) : (
-              // Entered from top-right
-              <>
-                <div className="w-1/2 absolute left-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-                <div className="h-1/2 absolute right-0 bottom-1/2 translate-y-[-8px] border-r-2 border-dashed border-accent-blue/40 -z-0" />
-              </>
-            )
-          )}
-        </>
-      )}
-
-      {/* Outgoing Line */}
-      {hasOutgoing && (
-        <>
-          {!isNextRowDifferent ? (
-            isRowEven ? (
-              // Out to right
-              <div className="w-1/2 absolute left-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-            ) : (
-              // Out to left
-              <div className="w-1/2 absolute right-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-            )
-          ) : (
-            isRowEven ? (
-              // Out to bottom-right
-              <>
-                <div className="w-1/2 absolute left-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-                <div className="h-1/2 absolute right-0 top-1/2 translate-y-[-8px] border-r-2 border-dashed border-accent-blue/40 -z-0" />
-              </>
-            ) : (
-              // Out to bottom-left
-              <>
-                <div className="w-1/2 absolute right-1/2 top-[50%] -translate-y-[8px] border-t-2 border-dashed border-accent-blue/40 -z-0" />
-                <div className="h-1/2 absolute left-0 top-1/2 translate-y-[-8px] border-l-2 border-dashed border-accent-blue/40 -z-0" />
-              </>
-            )
-          )}
-        </>
-      )}
-
-      {/* The Pin */}
-      <div className="relative z-10 w-10 h-12 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform duration-200">
-        <svg className="absolute inset-0 w-full h-full text-accent-blue drop-shadow-sm" viewBox="0 0 24 30" fill="currentColor">
-          <path d="M12 2C7.58 2 4 5.58 4 10c0 6 8 18 8 18s8-12 8-18c0-4.42-3.58-8-8-8z" />
-        </svg>
-        <span className="relative z-10 -mt-2.5 text-white font-bold text-xs select-none">
-          {index + 1}
-        </span>
-      </div>
-
-      {/* Absolute Labels */}
-      {labelPosition === 'above' ? (
-        <div className="absolute bottom-[calc(50%+16px)] left-1/2 -translate-x-1/2 mb-2 bg-white border border-border-dark/15 rounded-lg p-2 shadow-sm text-center w-[130px] z-20">
-          <span className="font-bold text-xs text-primary block truncate">{stop.stop_name}</span>
-          {stop.stop_note && <span className="text-[10px] text-secondary block truncate mt-0.5">{stop.stop_note}</span>}
-          <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-r border-b border-border-dark/15 rotate-45" />
-        </div>
-      ) : (
-        <div className="absolute top-[calc(50%+16px)] left-1/2 -translate-x-1/2 mt-2 bg-white border border-border-dark/15 rounded-lg p-2 shadow-sm text-center w-[130px] z-20">
-          <div className="absolute top-[-5px] left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-l border-t border-border-dark/15 rotate-45" />
-          <span className="font-bold text-xs text-primary block truncate">{stop.stop_name}</span>
-          {stop.stop_note && <span className="text-[10px] text-secondary block truncate mt-0.5">{stop.stop_note}</span>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const getSerpentineGridItems = (stops: TripStop[], cols: number) => {
-  const totalRows = Math.ceil(stops.length / cols);
-  const gridItems: (TripStop & { originalIndex: number })[] = [];
-
-  for (let r = 0; r < totalRows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const isRowEven = r % 2 === 0;
-      const index = isRowEven ? (r * cols + c) : (r * cols + (cols - 1 - c));
-      if (index < stops.length) {
-        gridItems.push({
-          ...stops[index],
-          originalIndex: index,
-        });
-      } else {
-        gridItems.push({
-          id: `empty-${r}-${c}`,
-          stop_name: '',
-          originalIndex: -1,
-        } as any);
-      }
-    }
-  }
-  return gridItems;
-};
 
 export function TripDetailView({
   trip,
@@ -693,9 +570,6 @@ export function TripDetailView({
               <Badge label={trip.trip_type} variant="info" />
               {trip.travel_style && <Badge label={trip.travel_style} variant="warning" />}
               {trip.submission_tier === 'Detailed Trip' && <Badge label="Detailed Trip" variant="success" />}
-              {trip.destination_province && (
-                <Badge label={`${trip.destination_province} (Map Collected)`} variant="success" />
-              )}
             </div>
           </div>
           
@@ -991,44 +865,33 @@ export function TripDetailView({
         )}
 
         {stops && stops.length > 0 && (
-          <div className="bg-soft-beige/30 border border-border-dark/15 rounded-xl shadow-sm p-6 md:p-8 flex flex-col gap-6">
+          <div className="bg-soft-beige/30 border border-border-dark/15 rounded-xl shadow-sm p-6 md:p-8 flex flex-col gap-5">
             <SectionHeader title="Places Visited" />
-            
-            {/* Desktop Layout (3 Columns) */}
-            <div className="hidden md:grid grid-cols-3 gap-y-4 w-full">
-              {getSerpentineGridItems(stops, 3).map((item) => {
-                if (item.originalIndex === -1) {
-                  return <div key={item.id} className="h-[180px] w-full" />;
-                }
-                return (
-                  <SerpentineStop
-                    key={item.id}
-                    stop={item}
-                    index={item.originalIndex}
-                    totalStops={stops.length}
-                    cols={3}
-                  />
-                );
-              })}
+
+            {/* Map view — only shown when stops have coordinates */}
+            <StopsPinsMap stops={stops} />
+
+            {/* Numbered list of stops */}
+            <div className="flex flex-col gap-2 mt-1">
+              {stops.map((stop, idx) => (
+                <div
+                  key={stop.id}
+                  className="flex items-start gap-3 py-2.5 px-3 rounded-lg bg-white/70 border border-border-dark/10 hover:border-border-dark/30 transition-colors"
+                >
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-white font-black text-xs flex items-center justify-center border border-white shadow-sm mt-0.5">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-primary leading-tight">{stop.stop_name}</p>
+                    {stop.stop_note && (
+                      <p className="text-xs text-secondary mt-0.5 leading-snug">{stop.stop_note}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Mobile/Tablet Layout (2 Columns) */}
-            <div className="grid md:hidden grid-cols-2 gap-y-4 w-full">
-              {getSerpentineGridItems(stops, 2).map((item) => {
-                if (item.originalIndex === -1) {
-                  return <div key={item.id} className="h-[180px] w-full" />;
-                }
-                return (
-                  <SerpentineStop
-                    key={item.id}
-                    stop={item}
-                    index={item.originalIndex}
-                    totalStops={stops.length}
-                    cols={2}
-                  />
-                );
-              })}
-            </div>
+            {/* Note: StopsPinsMap now auto-geocodes legacy stops natively */}
           </div>
         )}
 
@@ -1095,27 +958,7 @@ export function TripDetailView({
         )}
       </div>
 
-      {/* 6. Interactive Map */}
-      {trip.destination && (
-        <RetroPanel className="p-0 overflow-hidden">
-          <div className="bg-accent-blue text-white px-4 py-2 border-b-2 border-border-dark flex items-center gap-2">
-            <Map className="w-4 h-4 shrink-0" />
-            <span className="text-sm font-bold uppercase tracking-wider">Interactive Map</span>
-          </div>
-          <div className="w-full h-[300px] bg-soft-beige">
-            <iframe
-              title="Trip Map"
-              width="100%"
-              height="100%"
-              className="border-0 m-0 p-0"
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(trip.destination)}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
-            />
-          </div>
-        </RetroPanel>
-      )}
+
 
       {/* 7. Active Meetups Section */}
       {localHostings && localHostings.length > 0 && (

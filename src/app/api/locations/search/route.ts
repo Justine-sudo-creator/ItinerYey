@@ -10,18 +10,58 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+/**
+ * Build a clean, non-redundant region label.
+ * Skips province if it's the same as appRegion (e.g. "Metro Manila, Metro Manila" → "Metro Manila").
+ * Skips city if it's the same as province or appRegion (e.g. "Manila, Manila").
+ */
+function buildCleanRegion(city: string | null, province: string | null, appRegion: string): string {
+  const norm = (s: string | null) => (s || '').trim().toLowerCase();
+
+  // Drop province if redundant with appRegion
+  const cleanProvince = norm(province) === norm(appRegion) ? null : province;
+  // Drop city if redundant with province or appRegion
+  const cleanCity = (norm(city) === norm(cleanProvince) || norm(city) === norm(appRegion)) ? null : city;
+
+  const parts = [cleanCity, cleanProvince].filter(Boolean).join(', ');
+  return parts ? `${parts} (${appRegion})` : appRegion;
+}
+
+/**
+ * Deduplicate a list of search results by name (case-insensitive).
+ * Prefers entries with real coordinates over PSGC-only entries that have no lat/lng.
+ */
+function deduplicateResults(results: Record<string, unknown>[]): Record<string, unknown>[] {
+  // Sort: results with coordinates first (they're more useful)
+  const sorted = [...results].sort((a, b) => {
+    const aHasCoords = !!(a.structured && (a.structured as Record<string, unknown>).lat);
+    const bHasCoords = !!(b.structured && (b.structured as Record<string, unknown>).lat);
+    if (aHasCoords && !bHasCoords) return -1;
+    if (!aHasCoords && bHasCoords) return 1;
+    return 0;
+  });
+
+  const seen = new Map<string, boolean>();
+  return sorted.filter(item => {
+    const key = ((item.name as string) || '').trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.set(key, true);
+    return true;
+  });
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q');
   const isOrigin = searchParams.get('isOrigin') === 'true';
 
-  if (!q || q.length < 3) {
+  if (!q || q.length < 2) {
     return NextResponse.json([]);
   }
 
   try {
     const cleanQ = q.trim().toLowerCase();
-    const cacheKey = isOrigin ? `origin-${cleanQ}` : cleanQ;
+    const cacheKey = cleanQ; // Unified cache — origin and destination share geocoded results
 
     // 1. Search PSGC database (Supabase) for exact/partial official matches
     const { data: psgcData, error } = await supabase
@@ -37,7 +77,9 @@ export async function GET(request: Request) {
     // Format PSGC results
     const psgcResults = (psgcData || []).map(loc => {
       let displayName = loc.name;
+      // For barangays: "Cubao, Quezon City" — include city for disambiguation
       if (loc.type === 'Bgy' && loc.city_name) displayName += `, ${loc.city_name}`;
+      // Skip appending province if type is Province itself
       if (loc.province_name && loc.type !== 'Prov') displayName += `, ${loc.province_name}`;
 
       return {
@@ -58,12 +100,7 @@ export async function GET(request: Request) {
       };
     });
 
-    // 1.5. If this is an Origin query, return PSGC results immediately to avoid slow external APIs
-    if (isOrigin) {
-      return NextResponse.json(psgcResults);
-    }
-
-    // 2. Check the local Supabase cache for POIs
+    // 2. Check the local Supabase cache for POIs (fast path)
     const { data: cachedRow } = await supabase
       .from('location_search_cache')
       .select('results')
@@ -72,10 +109,11 @@ export async function GET(request: Request) {
 
     if (cachedRow?.results) {
       const cachedOsmResults = cachedRow.results as Record<string, unknown>[];
-      return NextResponse.json([...psgcResults, ...cachedOsmResults]);
+      const combined = deduplicateResults([...psgcResults, ...cachedOsmResults]);
+      return NextResponse.json(combined);
     }
 
-    // 3. Cache Miss: Resolve using Gemini with a strict timeout
+    // 3. Cache Miss: Resolve using Gemini with a reasonable timeout
     const geminiApiKey = process.env.GEMINI_API_KEY;
     let osmResults: Record<string, unknown>[] = [];
     let resolvedByGemini = false;
@@ -87,19 +125,20 @@ Resolve this search query into a list of the top 3 most likely matching specific
 
 Return a JSON array where each item has this exact JSON structure:
 {
-  "name": "Brief, clean name of the spot (e.g., 'Binondo', 'Bonifacio High Street', 'Tomas Morato')",
+  "name": "Brief, clean name of the spot (e.g., 'Cubao', 'Bonifacio High Street', 'Tomas Morato')",
   "city": "Name of the City or Municipality (e.g., 'Manila', 'Taguig', 'Quezon City')",
-  "province": "Name of the Province, or null for NCR",
+  "province": "Name of the Province only. Use null for NCR/Metro Manila cities — they have no province.",
   "appRegion": "One of these exact region labels: 'Metro Manila', 'North & Central Luzon', 'South Luzon & Bicol', 'Visayas', 'Mindanao'",
   "lat": 14.5995,
   "lng": 120.9842
 }
 
+IMPORTANT: For any location inside Metro Manila (NCR), province MUST be null. Metro Manila is not a province.
 Ensure the coordinates are as accurate as possible for the spot.
 Provide your response ONLY as a valid JSON array, without any markdown formatting or backticks.`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2-second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
 
         const geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -129,13 +168,13 @@ Provide your response ONLY as a valid JSON array, without any markdown formattin
           if (text) {
             const parsed = JSON.parse(text);
             osmResults = parsed.map((item: { name: string; city: string | null; province: string | null; appRegion: string; lat: number; lng: number }, index: number) => {
-              const cityProv = [item.city, item.province].filter(Boolean).join(', ');
+              const cleanRegion = buildCleanRegion(item.city, item.province, item.appRegion);
               return {
                 id: `ai-${cacheKey}-${index}`,
                 name: item.name,
                 shortName: item.name,
                 type: 'POI',
-                region: cityProv ? `${cityProv} (${item.appRegion})` : item.appRegion,
+                region: cleanRegion,
                 source: 'osm',
                 structured: {
                   place_id: `ai-${cacheKey}-${index}`,
@@ -180,7 +219,7 @@ Provide your response ONLY as a valid JSON array, without any markdown formattin
       }
     }
 
-    // 4. Fallback to OpenStreetMap if Gemini is unavailable or failed
+    // 4. Fallback to OpenStreetMap if Gemini is unavailable or timed out
     if (!resolvedByGemini) {
       try {
         const osmData = await searchNominatim(q);
@@ -196,7 +235,6 @@ Provide your response ONLY as a valid JSON array, without any markdown formattin
         const appRegionMap = new Map<string, string>();
         if (namesToQuery.size > 0) {
           const namesArray = Array.from(namesToQuery);
-          // Query matching locations in batch
           const { data: matches } = await supabase
             .from('locations')
             .select('name, app_region, type')
@@ -237,12 +275,7 @@ Provide your response ONLY as a valid JSON array, without any markdown formattin
           const id = `osm-${res.place_id}`;
           if (!uniqueOsm.has(id)) {
             const poiName = res.name || res.display_name.split(',')[0];
-            const cityProv = [
-              addr.city,
-              addr.province
-            ].filter(Boolean).join(', ');
-            
-            const cleanRegion = cityProv ? `${cityProv} (${appRegion})` : appRegion;
+            const cleanRegion = buildCleanRegion(addr.city, addr.province, appRegion);
  
             uniqueOsm.set(id, {
               id,
@@ -264,7 +297,7 @@ Provide your response ONLY as a valid JSON array, without any markdown formattin
         }
         osmResults = Array.from(uniqueOsm.values()).slice(0, 5);
 
-        // Also cache OSM results so we don't hit the rate limits for raw queries either!
+        // Cache OSM results to avoid hitting rate limits on repeat queries
         if (osmResults.length > 0) {
           await supabase
             .from('location_search_cache')
@@ -275,8 +308,8 @@ Provide your response ONLY as a valid JSON array, without any markdown formattin
       }
     }
  
-    // 5. Return PSGC + POI results
-    const combined = [...psgcResults, ...osmResults];
+    // 5. Merge, deduplicate by name (coords take priority), and return
+    const combined = deduplicateResults([...psgcResults, ...osmResults]);
     return NextResponse.json(combined);
 
   } catch (err) {

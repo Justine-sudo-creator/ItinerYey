@@ -188,6 +188,8 @@ export type TripStop = {
   stop_name: string
   stop_note: string | null
   display_order: number
+  lat: number | null
+  lng: number | null
   created_at: string
 }
 

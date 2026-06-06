@@ -11,7 +11,29 @@ import { PrimaryButton, SecondaryButton } from '@/components/ui/Button';
 import { TRIP_TYPES, TRAVEL_STYLES } from '@/lib/constants';
 import { User, Trip, TripStop, TripPhoto, TripDay } from '@/types/supabase';
 import { Award } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import type { StopPin } from '@/components/trip/StopMapPicker';
 
+const StopMapPicker = dynamic(() => import('@/components/trip/StopMapPicker'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[340px] bg-soft-beige/50 border-2 border-border-dark rounded-xl flex items-center justify-center">
+      <span className="font-bold text-xs text-secondary uppercase tracking-wider">Loading Map...</span>
+    </div>
+  ),
+});
+
+
+const InfoHelpButton = ({ onClick, title }: { onClick: () => void; title: string }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="w-5 h-5 rounded-full border border-border-dark bg-white hover:bg-soft-beige flex items-center justify-center text-[10px] font-black text-primary shadow-[1px_1px_0px_#1E1E1E] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all cursor-pointer shrink-0"
+    title={title}
+  >
+    i
+  </button>
+);
 
 type ShareTripFormProps = {
   returnTo: string;
@@ -68,15 +90,18 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
   const [originAreaState, setOriginAreaState] = useState(initialData?.origin_area || '');
   const [endAreaState, setEndAreaState] = useState(initialData?.end_area || '');
   const [routeContextInput, setRouteContextInput] = useState(initialData?.route_context || '');
+  const [isStopMapModalOpen, setIsStopMapModalOpen] = useState(false);
   
-  type TripStopInput = { id: string, name: string, note: string };
-  const [tripStops, setTripStops] = useState<TripStopInput[]>(
-    initialData?.trip_stops?.map((s: TripStop) => ({ id: Math.random().toString(36).substr(2, 9), name: s.stop_name, note: s.stop_note || '' })) || []
+  // StopPin is the map-picker format: { id, lat, lng, name, note }
+  const [tripStops, setTripStops] = useState<StopPin[]>(
+    initialData?.trip_stops?.map((s: TripStop) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: s.stop_name,
+      note: s.stop_note || '',
+      lat: s.lat ?? 0,
+      lng: s.lng ?? 0,
+    })) || []
   );
-
-  const addTripStop = () => setTripStops([...tripStops, { id: Math.random().toString(36).substr(2, 9), name: '', note: '' }]);
-  const removeTripStop = (id: string) => setTripStops(tripStops.filter(s => s.id !== id));
-  const updateTripStop = (id: string, field: 'name' | 'note', val: string) => setTripStops(tripStops.map(s => s.id === id ? { ...s, [field]: val } : s));
   
   const [travelDate, setTravelDate] = useState(initialData?.travel_date || '');
   const [groupSize, setGroupSize] = useState(initialData?.group_size?.toString() || '1');
@@ -122,6 +147,11 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
   const [isCurated, setIsCurated] = useState(initialData?.is_curated || false);
   const [attributionSource, setAttributionSource] = useState(initialData?.attribution_source || '');
   
+  const [infoModal, setInfoModal] = useState<{ title: string; content: React.ReactNode } | null>(null);
+  const handleShowInfo = (title: string, content: React.ReactNode) => {
+    setInfoModal({ title, content });
+  };
+  
   // Reconstruct days from initialData.trip_days
   const initialDays = (initialData?.trip_days?.length ?? 0) > 0 ? (() => {
     // Group blocks by day_number
@@ -163,7 +193,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
   const [showAdvancedRoute, setShowAdvancedRoute] = useState(false);
   const [showHumanLayer, setShowHumanLayer] = useState(isEdit);
   const [isPublic, setIsPublic] = useState(initialData?.is_public !== undefined ? !!initialData.is_public : true);
-  const [isSnapshot, setIsSnapshot] = useState(initialData?.submission_tier === 'basic' || false);
+  const [isSnapshot, setIsSnapshot] = useState(false);
 
   // Auto-Save Draft to LocalStorage (for create mode only)
   React.useEffect(() => {
@@ -591,7 +621,9 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         const stopsPayload = isSnapshot ? [] : tripStops.filter(s => s.name.trim() !== '').map((s, i) => ({
           stop_name: s.name.trim(),
           stop_note: s.note.trim() || null,
-          display_order: i
+          display_order: i,
+          lat: s.lat || null,
+          lng: s.lng || null,
         }));
 
         // Prepare days payload
@@ -671,6 +703,8 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
             stop_name: s.name.trim(),
             stop_note: s.note.trim() || null,
             display_order: i,
+            lat: s.lat || null,
+            lng: s.lng || null,
           });
           if (stopError) {
             console.error("Stop DB Insert Error:", stopError);
@@ -799,20 +833,12 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
     : !!destination;
 
   return (
+    <>
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6 relative">
-      {/* Dev Auto-Fill Helper Button (Dev/Admin only, but exposed absolutely here for ease of testing) */}
-      <button 
-        type="button" 
-        onClick={fillDevMockData}
-        className="absolute top-[-48px] right-0 bg-accent-coral border-2 border-border-dark text-white font-black text-xs px-3 py-1.5 rounded-md hover:bg-accent-coral/95 transition-all shadow-[4px_4px_0px_#1E1E1E] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_#1E1E1E]"
-      >
-        ⚡ Dev Auto-Fill (Tagaytay)
-      </button>
-
-      {/* Consolidated Publishing & Submission Format Panel */}
+      {/* Consolidated Publishing Panel */}
       <div className="flex flex-col gap-4 bg-surface p-4 border border-border-dark/15 rounded-lg shadow-sm">
         {/* Toggle 1: Publish Checkbox */}
-        <label className="flex items-center gap-3 cursor-pointer select-none border-b border-border-dark/10 pb-3">
+        <label className={`flex items-center gap-3 cursor-pointer select-none ${!isPublic ? 'border-b border-border-dark/10 pb-3' : ''}`}>
           <input 
             type="checkbox" 
             checked={isPublic}
@@ -824,47 +850,9 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
           </span>
         </label>
         
-        {!isPublic ? (
+        {!isPublic && (
           <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-md p-3 text-xs font-bold text-primary">
             🔒 Draft Mode: Just enter a destination to save a private planner draft in your Locker.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <span className="font-bold text-xs uppercase tracking-wider text-secondary">Submission Format</span>
-            
-            <div className="flex flex-col gap-3">
-              {/* Option A: Quick Snapshot */}
-              <label className="flex items-start gap-3 cursor-pointer select-none">
-                <input
-                  type="radio"
-                  name="submissionTier"
-                  checked={isSnapshot}
-                  onChange={() => setIsSnapshot(true)}
-                  className="w-4 h-4 mt-1 accent-primary border border-border-dark/15 cursor-pointer flex-shrink-0"
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-primary">
-                    Quick Snapshot <span className="text-xs font-normal text-secondary">(Fastest way to contribute. You can always edit this trip later to add details.)</span>
-                  </span>
-                </div>
-              </label>
-
-              {/* Option B: Detailed Guide */}
-              <label className="flex items-start gap-3 cursor-pointer select-none border-t border-border-dark/10 pt-3">
-                <input
-                  type="radio"
-                  name="submissionTier"
-                  checked={!isSnapshot}
-                  onChange={() => setIsSnapshot(false)}
-                  className="w-4 h-4 mt-1 accent-primary border border-border-dark/15 cursor-pointer flex-shrink-0"
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-primary">
-                    Detailed Guide <span className="text-xs font-normal text-secondary">(Help other travelers fully copy your trip by adding cost breakdowns, itinerary, specific stops, and notes.)</span>
-                  </span>
-                </div>
-              </label>
-            </div>
           </div>
         )}
       </div>
@@ -872,77 +860,154 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
 
       {/* SECTION 1 */}
       <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
-        <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded mb-4 shadow-sm">
-          Trip Basics
-        </h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm mb-0">
+            Trip Basics
+          </h3>
+          <InfoHelpButton
+            title="Trip Basics Example"
+            onClick={() => handleShowInfo("Trip Basics Example", (
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-semibold text-secondary">
+                  Here is an example of a fully completed Trip Basics section to show how all fields connect:
+                </p>
+                <div className="border-2 border-border-dark rounded-md bg-white p-4 shadow-hard-sm text-xs font-semibold text-primary space-y-2.5">
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Trip Name</span>
+                    <span className="text-primary font-bold">Sponty Tagaytay Trip with Barkada</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Destination</span>
+                    <span className="text-primary font-bold">Tagaytay</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Stops</span>
+                    <span className="text-primary font-bold">Picnic Grove, Mahogany Market, Cafe de Lipa</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Starting Point</span>
+                    <span className="text-primary font-bold">Quezon City</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Travel Date</span>
+                    <span className="text-primary font-bold">03/15/2026</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Group Size</span>
+                    <span className="text-primary font-bold">4</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Trip Type</span>
+                    <span className="text-primary font-bold">Barkada</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary uppercase text-[10px] font-black block mb-0.5">Duration</span>
+                    <span className="text-primary font-bold">Day Trip (8 hours)</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          />
+        </div>
         <div className="flex flex-col gap-4">
           <TextInput
-            label="Trip Name (Optional)"
-            placeholder="e.g. Gala sa Eastwood, Chill afternoon at BGC"
+            label="Trip Name"
+            placeholder="e.g. Gala sa Eastwood, Sponty trip sa Tagaytay"
             value={tripName}
             onChange={e => setTripName(e.target.value)}
           />
-          <LocationAutocomplete
-            label="Destination"
-            placeholder={isPublic ? "Where did you go?" : "Where are you planning to go?"}
-            value={destination}
-            onChange={(d, r, struct) => { 
-              setDestination(d); 
-              setDestinationRegion(r || d); 
-              setDestStructured(struct);
-            }}
-          />
+          <div className="flex flex-col gap-1">
+            <LocationAutocomplete
+              label="Destination *"
+              placeholder={isPublic ? "Where did you go?" : "Where are you planning to go?"}
+              value={destination}
+              onChange={(d, r, struct) => { 
+                setDestination(d); 
+                setDestinationRegion(r || d); 
+                setDestStructured(struct);
+              }}
+            />
+          </div>
           
           {/* Hide Stops in Quick Snapshot Mode */}
           {!isSnapshot && (
-            <div className="flex flex-col gap-2 border border-border-dark/15 rounded-lg p-4 bg-white/50 animate-in fade-in">
-              <Label>{isPublic ? 'Places Visited / Stops' : 'Places to Visit / Stops'} (Optional)</Label>
-              <p className="text-xs text-secondary italic">
-                {isPublic ? 'Add specific restaurants, cafes, malls, parks, or attractions you visited. This helps others copy your trip.' : 'Add specific restaurants, cafes, malls, parks, or attractions you want to visit.'}
-              </p>
+            <div className="flex flex-col gap-3 border border-border-dark/15 rounded-lg p-4 bg-white/50 animate-in fade-in">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label className="mb-0">{isPublic ? 'Places Visited / Stops / Other Destinations' : 'Places to Visit / Stops / Other Destinations'}</Label>
+                  <InfoHelpButton
+                    title={isPublic ? 'Places Visited Example' : 'Places to Visit Example'}
+                    onClick={() => handleShowInfo(isPublic ? 'Places Visited' : 'Places to Visit', (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-xs font-semibold text-secondary">
+                          Pin the specific spots, establishments, or attractions you visited. Pinned stops are accurately plotted on your trip's interactive map details!
+                        </p>
+                        <div className="border-2 border-border-dark rounded-md bg-white p-3 shadow-hard-sm">
+                          <span className="font-bold text-xs uppercase text-secondary block mb-2">Example Sequence:</span>
+                          <div className="space-y-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">1</span>
+                              <span className="text-xs font-bold text-primary">QC Cubao Terminal <span className="text-secondary/70 font-normal">(Bus Station)</span></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">2</span>
+                              <span className="text-xs font-bold text-primary">Mahogany Beef Market & Bulalohan <span className="text-secondary/70 font-normal">(Food Stop)</span></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">3</span>
+                              <span className="text-xs font-bold text-primary">People's Park in the Sky <span className="text-secondary/70 font-normal">(Sightseeing)</span></span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">4</span>
+                              <span className="text-xs font-bold text-primary">Twin Lakes Tagaytay <span className="text-secondary/70 font-normal">(Scenic Plaza/Cafes)</span></span>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs italic text-secondary">
+                          Try searching for the exact name of the establishment in the map search bar to pin the exact coordinates, rather than just the general city.
+                        </p>
+                      </div>
+                    ))}
+                  />
+                </div>
+                <p className="text-xs text-secondary italic mt-1">
+                  {isPublic
+                    ? 'Pin the restaurants, cafes, malls, parks, or attractions you visited, in order.'
+                    : 'Pin the restaurants, cafes, malls, parks, or attractions you plan to visit, in order.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStopMapModalOpen(true)}
+                className="w-full py-3.5 bg-white border-2 border-border-dark rounded-xl shadow-hard font-bold text-sm text-primary hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2"
+              >
+                 Open Map to Pin Stops
+              </button>
               
-              {tripStops.map((s) => (
-                <div key={s.id} className="relative border-b-2 border-border-dark pb-3 mb-2 pr-10">
-                  <button 
-                    type="button" 
-                    onClick={() => removeTripStop(s.id)}
-                    className="absolute right-0 bottom-3 bg-accent-coral text-white font-bold w-8 h-[42px] border border-border-dark/15 rounded-md shadow-sm hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center text-sm"
-                    aria-label="Remove stop"
-                  >
-                    X
-                  </button>
-                  <div className="grid grid-cols-2 gap-2">
-                    <TextInput 
-                      label="Stop Name" 
-                      placeholder="e.g. Market Market" 
-                      value={s.name} 
-                      onChange={e => updateTripStop(s.id, 'name', e.target.value)}
-                    />
-                    <TextInput 
-                      label="Note (Optional)" 
-                      placeholder="e.g. Best place for dinner" 
-                      value={s.note} 
-                      onChange={e => updateTripStop(s.id, 'note', e.target.value)}
-                    />
+              {tripStops.length > 0 && (
+                <div className="flex flex-col gap-2 mt-1 border border-border-dark/10 rounded-lg p-3 bg-white/60">
+                  <p className="text-xs font-bold text-primary flex justify-between items-center">
+                    <span>Pinned Stops:</span>
+                    <span className="text-secondary/70 font-normal">{tripStops.length} stop{tripStops.length !== 1 ? 's' : ''}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {tripStops.map((stop, idx) => (
+                      <div key={stop.id} className="flex items-center gap-2 bg-white border border-border-dark/20 rounded-full pl-1.5 pr-3 py-1 shadow-sm max-w-full">
+                        <span className="bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">{idx + 1}</span>
+                        <span className="text-xs font-bold text-primary truncate">{stop.name}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-              
-              <button 
-                type="button" 
-                onClick={addTripStop}
-                className="mt-2 py-2 px-4 bg-accent-blue text-white border border-border-dark/15 rounded-md shadow-sm font-bold text-sm self-start hover:-translate-y-0.5 active:translate-y-0 transition-all"
-              >
-                + Add Stop
-              </button>
+              )}
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div className="flex flex-col gap-1 col-span-2">
               <LocationAutocomplete
-                label="Origin City / Province"
-                placeholder="Where are you from?"
+                label="Starting Point (First Transport) *"
+                placeholder="Where did you start your journey? (City/Province)"
                 value={originRegion}
                 onChange={(v, _r, struct) => {
                   if (struct && (struct.city || struct.province)) {
@@ -958,7 +1023,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                 }}
                 isOriginMode={true}
               />
-              <p className="text-xs text-secondary">Choose the city/province you started from. Do not enter your exact home address.</p>
+              <p className="text-xs text-secondary">Choose only the city/province you started from, not specific address.</p>
             </div>
             
             {/* Hide Route details Toggle in Quick Snapshot Mode */}
@@ -984,7 +1049,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                 <div className="flex flex-col gap-1">
                   <TextInput
                     label="Starting Area / Route Start"
-                    placeholder="e.g. Ateneo / Katipunan area"
+                    placeholder="e.g. Philcoa / Cubao area / Commonwealth Market"
                     value={originAreaState}
                     onChange={(e) => setOriginAreaState(e.target.value)}
                   />
@@ -994,7 +1059,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                 <div className="flex flex-col gap-1">
                   <TextInput
                     label="Ending Area / Route End (Optional)"
-                    placeholder="e.g. Bagong Silangan, Cubao"
+                    placeholder="e.g. Maginhawa / Cubao / Sandigan"
                     value={endAreaState}
                     onChange={(e) => setEndAreaState(e.target.value)}
                   />
@@ -1012,13 +1077,13 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               </>
             )}
 
-            <TextInput label={`Travel Date ${!isPublic ? '(Optional)' : ''}`} type="date" value={travelDate} onChange={e => setTravelDate(e.target.value)} required={isPublic} />
-            <TextInput label={`Group Size (Pax) ${!isPublic ? '(Optional)' : ''}`} type="number" min="1" value={groupSize} onChange={e => setGroupSize(e.target.value)} required={isPublic} />
-            <SelectInput label={`Trip Type ${!isPublic ? '(Optional)' : ''}`} value={tripType} onChange={e => setTripType(e.target.value)} options={TRIP_TYPES.map(r => ({ value: r, label: r }))} required={isPublic} />
+            <TextInput label={`Travel Date * ${!isPublic ? '(Optional)' : ''}`} type="date" value={travelDate} onChange={e => setTravelDate(e.target.value)} required={isPublic} />
+            <TextInput label={`Group Size (Pax) * ${!isPublic ? '(Optional)' : ''}`} type="number" min="1" value={groupSize} onChange={e => setGroupSize(e.target.value)} required={isPublic} />
+            <SelectInput label={`Trip Type * ${!isPublic ? '(Optional)' : ''}`} value={tripType} onChange={e => setTripType(e.target.value)} options={TRIP_TYPES.map(r => ({ value: r, label: r }))} required={isPublic} />
             
             <div className="flex flex-col gap-1">
               <SelectInput 
-                label={isPublic ? "How long did the trip take?" : "How long will the trip take?"} 
+                label={isPublic ? "How long did the trip take? *" : "How long will the trip take?"} 
                 value={tripDurationLabel} 
                 onChange={e => setTripDurationLabel(e.target.value)} 
                 options={[
@@ -1034,7 +1099,6 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                   { value: 'Not sure', label: 'Not sure' }
                 ]}
               />
-              <p className="text-xs text-secondary">Estimate the actual time spent, including travel time if possible.</p>
             </div>
             
             {/* Calendar Days input only shows for Detailed when showAdvancedRoute is checked. In Snapshot, we assume it is estimated by tripDurationLabel (defaulting to 1 day) */}
@@ -1058,9 +1122,57 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
 
       {/* SECTION 2 (Costs) */}
       <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
-        <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded mb-4 shadow-sm">
-          {isPublic ? 'Real Costs' : 'Estimated Budget'}
-        </h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm mb-0">
+            {isPublic ? 'Real Costs' : 'Estimated Budget'}
+          </h3>
+          <InfoHelpButton 
+            title="Real Costs Example" 
+            onClick={() => handleShowInfo(isPublic ? 'Real Costs Example' : 'Estimated Budget Example', (
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-semibold text-secondary">
+                  Here is how your cost breakdown can look:
+                </p>
+                <div className="border-2 border-border-dark rounded-md overflow-hidden shadow-hard-sm">
+                  <table className="w-full text-xs font-bold text-left border-collapse bg-surface">
+                    <thead>
+                      <tr className="bg-accent-yellow border-b-2 border-border-dark text-primary uppercase tracking-wider text-[10px]">
+                        <th className="p-2 border-r-2 border-border-dark">Category</th>
+                        <th className="p-2 border-r-2 border-border-dark">Description</th>
+                        <th className="p-2">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-border-dark">
+                      <tr className="hover:bg-soft-beige/30">
+                        <td className="p-2 border-r-2 border-border-dark font-mono text-accent-blue text-[10px]">Transport</td>
+                        <td className="p-2 border-r-2 border-border-dark font-medium">Bus from Cubao to Tagaytay</td>
+                        <td className="p-2 font-mono">₱150</td>
+                      </tr>
+                      <tr className="hover:bg-soft-beige/30">
+                        <td className="p-2 border-r-2 border-border-dark font-mono text-accent-blue text-[10px]">Transport</td>
+                        <td className="p-2 border-r-2 border-border-dark font-medium">Jeep from terminal to hotel</td>
+                        <td className="p-2 font-mono">₱20</td>
+                      </tr>
+                      <tr className="hover:bg-soft-beige/30">
+                        <td className="p-2 border-r-2 border-border-dark font-mono text-accent-coral text-[10px]">Food</td>
+                        <td className="p-2 border-r-2 border-border-dark font-medium">Lunch at Mahogany Market</td>
+                        <td className="p-2 font-mono">₱120</td>
+                      </tr>
+                      <tr className="hover:bg-soft-beige/30">
+                        <td className="p-2 border-r-2 border-border-dark font-mono text-accent-coral text-[10px]">Food</td>
+                        <td className="p-2 border-r-2 border-border-dark font-medium">Merienda at local bakery</td>
+                        <td className="p-2 font-mono">₱35</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs italic text-secondary mt-1">
+                   Enter your expenses, and we will aggregate them into the respective categories automatically.
+                </p>
+              </div>
+            ))} 
+          />
+        </div>
 
         {/* Cost Scope Selector */}
         <div className="flex flex-col gap-2 mb-4 bg-white/40 p-3 border border-border-dark/15 rounded-md">
@@ -1176,7 +1288,6 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
                 </>
               ) : (
                 <div className="flex flex-col gap-4 border border-border-dark/15 rounded-lg p-4 bg-white/50">
-                  <p className="text-xs text-secondary mb-2 italic">List down your specific costs below. We will aggregate them into the respective categories automatically.</p>
                   
                   {detailedCosts.map((c) => (
                     <div key={c.id} className="relative border-b border-border-dark/10 pb-4 mb-3 pr-10">
@@ -1279,7 +1390,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between cursor-pointer mb-4" onClick={() => setShowHumanLayer(!showHumanLayer)}>
             <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm">
-              Description
+              Trip Description & Tips
             </h3>
             <span className="font-bold border border-border-dark/15 rounded px-2">{showHumanLayer ? '-' : '+'}</span>
           </div>
@@ -1298,9 +1409,42 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
       {!isSnapshot && (
         <div className="bg-surface border border-border-dark/15 rounded-lg p-4 shadow-sm animate-in fade-in">
           <div className="flex items-center justify-between cursor-pointer mb-4" onClick={() => setShowItinerary(!showItinerary)}>
-            <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm">
-              {isPublic ? 'Detailed Trip Notes' : 'Planned Itinerary'}
-            </h3>
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <h3 className="bg-accent-yellow inline-block px-2 py-1 font-bold text-sm border border-border-dark/15 rounded shadow-sm mb-0">
+                {isPublic ? 'Trip Notes & Itinerary' : 'Planned Itinerary'}
+              </h3>
+              <InfoHelpButton
+                title={isPublic ? 'Trip Itinerary & Notes Example' : 'Planned Itinerary Example'}
+                onClick={() => handleShowInfo(isPublic ? 'Trip Notes & Itinerary' : 'Planned Itinerary', (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-xs font-semibold text-secondary">
+                      Structure your daily timeline to give other travelers an easy schedule to copy.
+                    </p>
+                    <div className="border-2 border-border-dark rounded-md bg-white p-3 shadow-hard-sm">
+                      <span className="font-bold text-xs uppercase text-secondary block mb-2">Example Timeline (Day 1):</span>
+                      <div className="space-y-2 font-semibold text-xs text-primary">
+                        <div className="flex items-start gap-1">
+                          <span className="text-accent-blue font-mono shrink-0">07:00 AM:</span>
+                          <span>Board bus at Cubao Terminal</span>
+                        </div>
+                        <div className="flex items-start gap-1">
+                          <span className="text-accent-blue font-mono shrink-0">09:30 AM:</span>
+                          <span>Arrive in Tagaytay, take a jeep to hotel</span>
+                        </div>
+                        <div className="flex items-start gap-1">
+                          <span className="text-accent-blue font-mono shrink-0">12:00 PM:</span>
+                          <span>Lunch at Mahogany Bulalohan</span>
+                        </div>
+                        <div className="flex items-start gap-1">
+                          <span className="text-accent-blue font-mono shrink-0">02:00 PM:</span>
+                          <span>Visit People's Park in the Sky</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              />
+            </div>
             <span className="font-bold border border-border-dark/15 rounded px-2">{showItinerary ? '-' : '+'}</span>
           </div>
           
@@ -1309,7 +1453,40 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
               <p className="text-sm font-bold text-primary bg-primary/10 p-2 border-l-4 border-primary">
                 Optional, but this helps others copy your trip.
               </p>
-              <TextAreaInput label={isPublic ? "One thing that didn’t go as planned" : "Notes or concerns"} placeholder={isPublic ? "e.g. Don't eat at the port stalls — overpriced and slow" : "Things to watch out for..."} value={honestWarning} onChange={e => setHonestWarning(e.target.value)} />
+              
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Label className="mb-0">{isPublic ? "One thing that didn’t go as planned" : "Notes or concerns"}</Label>
+                  <InfoHelpButton
+                    title={isPublic ? "Honest Warning Example" : "Notes & Concerns Example"}
+                    onClick={() => handleShowInfo(isPublic ? "Honest Warning" : "Notes & Concerns", (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-xs font-semibold text-secondary">
+                          Help other travelers avoid common pitfalls, scams, or inconveniences that you experienced during your trip.
+                        </p>
+                        <div className="border-2 border-border-dark rounded-md bg-white p-3 shadow-hard-sm">
+                          <span className="font-bold text-xs uppercase text-secondary block mb-2">Example Warnings:</span>
+                          <ul className="list-disc pl-4 text-xs font-semibold text-primary space-y-1.5">
+                            <li>
+                              <span className="italic">&quot;Traffic going back to Manila on Sunday afternoon is terrible. Leave before 3:00 PM if possible.&quot;</span>
+                            </li>
+                            <li>
+                              <span className="italic">&quot;Avoid tricycle drivers outside the main terminal who charge flat rates of ₱150+ for short rides. Take a jeep instead for only ₱15.&quot;</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  />
+                </div>
+                <textarea
+                  className="bg-surface border-2 border-border-dark rounded-sm px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-primary focus:outline-none focus:ring-2 focus:ring-accent-blue transition-shadow min-h-[80px]"
+                  placeholder={isPublic ? "e.g. Don't eat at the port stalls — overpriced and slow" : "Things to watch out for..."}
+                  value={honestWarning}
+                  onChange={e => setHonestWarning(e.target.value)}
+                  rows={3}
+                />
+              </div>
 
               <div className="mt-4 flex flex-col gap-6">
                 {days.map((day, idx) => (
@@ -1398,7 +1575,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
           {isPublic ? (
             <ul className="list-disc pl-4 space-y-1.5 font-medium leading-relaxed">
               <li className={isBasicsCompleted ? "text-secondary line-through opacity-60 decoration-2" : "text-primary font-bold"}>
-                <strong>Basics section:</strong> Destination, Origin, Travel Date, Group Size, Trip Type, and Duration are all required.
+                <strong>Basics section:</strong> Destination, Starting Point, Travel Date, Group Size, Trip Type, and Duration are all required.
               </li>
               {!isEdit && (
                 <li className={isPhotosCompleted ? "text-secondary line-through opacity-60 decoration-2" : "text-primary font-bold"}>
@@ -1430,6 +1607,91 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         )}
       </PrimaryButton>
     </form>
+
+    {isStopMapModalOpen && (
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-soft-beige/95 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+        <div className="h-[100dvh] w-full max-w-3xl mx-auto flex flex-col p-4 md:p-6 lg:p-8 gap-4">
+          <div className="flex items-center justify-between shrink-0">
+            <div>
+              <h2 className="font-black text-xl text-primary">Map Your Stops</h2>
+              <p className="text-sm text-secondary">Pin locations you visited.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsStopMapModalOpen(false)}
+              className="w-10 h-10 rounded-full bg-white border-2 border-border-dark flex items-center justify-center font-black text-lg hover:bg-accent-coral hover:text-white transition-colors shadow-hard"
+              aria-label="Close Map"
+            >
+              ×
+            </button>
+          </div>
+          
+          <div className="flex-1 min-h-0 flex flex-col">
+            <StopMapPicker
+              stops={tripStops}
+              onChange={setTripStops}
+              centerLat={destStructured?.lat ?? null}
+              centerLng={destStructured?.lng ?? null}
+            />
+          </div>
+
+          <div className="shrink-0 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsStopMapModalOpen(false)}
+              className="w-full py-4 bg-primary text-white font-black rounded-xl border-2 border-border-dark shadow-hard hover:-translate-y-0.5 active:translate-y-0 transition-all text-lg"
+            >
+              Done Pinning
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {infoModal && (
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        {/* Backdrop */}
+        <div 
+          onClick={() => setInfoModal(null)}
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
+        />
+        
+        {/* Modal Card */}
+        <div className="relative w-full max-w-lg bg-soft-beige border-4 border-border-dark shadow-hard flex flex-col z-[10001] overflow-hidden animate-in zoom-in-95 duration-200">
+          
+          {/* Modal Header */}
+          <div className="flex items-center justify-between p-4 border-b-4 border-border-dark bg-accent-yellow">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-border-dark bg-surface font-black text-sm shadow-hard-sm">i</span>
+              <h2 className="text-base md:text-lg font-black font-display tracking-tight text-primary uppercase">{infoModal.title}</h2>
+            </div>
+            <button 
+              onClick={() => setInfoModal(null)}
+              className="w-8 h-8 border-2 border-border-dark bg-surface shadow-hard-sm hover:translate-y-0.5 hover:shadow-none active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all flex items-center justify-center font-bold text-sm"
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-4 md:p-6 bg-white select-text text-sm font-semibold text-primary/80 leading-relaxed max-h-[60vh] overflow-y-auto">
+            {infoModal.content}
+          </div>
+
+          {/* Modal Footer */}
+          <div className="p-4 border-t-2 border-border-dark bg-surface flex justify-end">
+            <button 
+              onClick={() => setInfoModal(null)}
+              className="text-xs font-bold uppercase tracking-wider border-2 border-border-dark px-4 py-2 bg-accent-blue text-white shadow-hard-sm hover:translate-y-0.5 hover:shadow-none active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all"
+            >
+              Got it, thanks!
+            </button>
+          </div>
+
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
