@@ -22,13 +22,4 @@ export function SecondaryButton({ children, className = '', ...props }: React.Bu
   );
 }
 
-export function IconButton({ children, className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      className={`flex items-center justify-center w-10 h-10 bg-surface border-2 border-border-dark rounded-sm shadow-hard-sm active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
+

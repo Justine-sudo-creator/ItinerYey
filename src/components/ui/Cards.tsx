@@ -13,14 +13,6 @@ export function RetroPanel({ children, label, className = '' }: { children: Reac
   );
 }
 
-export function RetroCard({ children, className = '' }: { children: React.ReactNode, className?: string }) {
-  return (
-    <div className={`bg-soft-beige/30 border border-border-dark/15 rounded-lg p-4 relative ${className}`}>
-      {children}
-    </div>
-  );
-}
-
 export function SectionHeader({ title, action }: { title: string, action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between mb-4 border-b border-border-dark/10 pb-2">
