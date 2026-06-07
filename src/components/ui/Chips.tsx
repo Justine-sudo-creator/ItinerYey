@@ -1,23 +1,5 @@
 import React from 'react';
 
-interface FilterChipProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  active?: boolean;
-  label: string;
-}
-
-export function FilterChip({ active, label, className = '', ...props }: FilterChipProps) {
-  return (
-    <button
-      className={`px-3 py-1 text-sm font-bold border-2 border-border-dark rounded-sm whitespace-nowrap transition-colors ${
-        active ? 'bg-accent-yellow text-primary' : 'bg-surface text-secondary hover:bg-soft-beige'
-      } ${className}`}
-      {...props}
-    >
-      {label}
-    </button>
-  );
-}
-
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   label: string;
   variant?: 'neutral' | 'success' | 'warning' | 'info' | 'error';

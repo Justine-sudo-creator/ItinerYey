@@ -1,4 +1,4 @@
-import { compressImage } from './imageCompressor';
+import { compressImage } from './imageCompression';
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dfrcdutb3';
 const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'nq7hgxmb';

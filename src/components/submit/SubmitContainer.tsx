@@ -12,7 +12,7 @@ type SubmitContainerProps = {
   isAdmin?: boolean;
 };
 
-type TabType = 'trip' | 'tip' | 'update';
+type TabType = 'trip' | 'tip';
 
 export default function SubmitContainer({ userProfile, isAdmin = false }: SubmitContainerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('trip');
@@ -25,7 +25,7 @@ export default function SubmitContainer({ userProfile, isAdmin = false }: Submit
     const typeParam = params.get('type');
     const returnToParam = params.get('returnTo');
 
-    if (typeParam === 'trip' || typeParam === 'tip' || typeParam === 'update') {
+    if (typeParam === 'trip' || typeParam === 'tip') {
       setActiveTab(typeParam as TabType);
     }
     if (returnToParam) {

@@ -20,14 +20,6 @@ export const TRIP_TYPES = [
   'Shopping',
 ]
 
-export const GROUP_TYPES = [
-  'Solo',
-  'Couple',
-  'Friends',
-  'Family',
-  'Business',
-]
-
 export const TRAVEL_STYLES = [
   'Budget',
   'Standard',
@@ -35,10 +27,4 @@ export const TRAVEL_STYLES = [
   'Backpacker',
 ]
 
-export const FILTER_CHIPS = [
-  'All',
-  'Popular',
-  'Newest',
-  'Budget Friendly',
-  'Luxury',
-]
+

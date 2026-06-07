@@ -1,13 +1,6 @@
 import { Trip } from '@/types/supabase';
 import { NominatimResult } from '@/lib/nominatim';
 
-const NEAR_MANILA_KEYWORDS = [
-  'ncr', 'metro manila', 'manila', 'rizal', 'cavite', 'laguna', 'batangas', 
-  'bulacan', 'pampanga', 'zambales', 'bataan', 'national capital region',
-  'quezon city', 'makati', 'taguig', 'pasig', 'province of rizal',
-  'calabarzon', 'region iv-a', 'central luzon'
-];
-
 const COMMUTE_FRIENDLY_KEYWORDS = [
   'ncr', 'metro manila', 'manila', 'rizal', 'cavite', 'laguna', 'bulacan', 'pampanga',
   'national capital region', 'quezon city', 'makati', 'taguig', 'pasig'
@@ -25,30 +18,6 @@ export function extractLocationRegion(addr: NominatimResult['address']): {
   const country = addr.country || null;
 
   return { city, province, country };
-}
-
-export function generatePlaceId(res: NominatimResult): string {
-  if (res.osm_type && res.osm_id) {
-    return `${res.osm_type}:${res.osm_id}`;
-  }
-  return res.place_id.toString();
-}
-
-export function isNearManilaTrip(trip: Trip): boolean {
-  // Prefer structured fields
-  if (trip.destination_province) {
-    const p = trip.destination_province.toLowerCase();
-    if (NEAR_MANILA_KEYWORDS.some(kw => p.includes(kw))) return true;
-  }
-  if (trip.destination_city) {
-    const c = trip.destination_city.toLowerCase();
-    if (NEAR_MANILA_KEYWORDS.some(kw => c.includes(kw))) return true;
-  }
-
-  // Fallback to text matching
-  const dest = (trip.destination || '').toLowerCase();
-  const destRegion = (trip.destination_region || '').toLowerCase();
-  return NEAR_MANILA_KEYWORDS.some(kw => dest.includes(kw) || destRegion.includes(kw));
 }
 
 export function isCommuteFriendlyTrip(trip: Trip): boolean {
