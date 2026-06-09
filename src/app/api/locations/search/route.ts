@@ -24,7 +24,19 @@ function buildCleanRegion(city: string | null, province: string | null, appRegio
   const cleanCity = (norm(city) === norm(cleanProvince) || norm(city) === norm(appRegion)) ? null : city;
 
   const parts = [cleanCity, cleanProvince].filter(Boolean).join(', ');
-  return parts ? `${parts} (${appRegion})` : appRegion;
+
+  if (!parts) return appRegion;
+
+  // If appRegion is already contained in parts (e.g. "Metro Manila" in "Quezon City, Metro Manila"),
+  // don't wrap it in parentheses again — just return parts as-is.
+  if (parts.toLowerCase().includes(norm(appRegion))) return parts;
+
+  // For Metro Manila cities with no province, combine cleanly: "Quezon City, Metro Manila"
+  if (appRegion === 'Metro Manila' && !cleanProvince && cleanCity) {
+    return `${cleanCity}, Metro Manila`;
+  }
+
+  return `${parts} (${appRegion})`;
 }
 
 /**

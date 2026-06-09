@@ -41,6 +41,7 @@ type ShareTripFormProps = {
   mode?: 'create' | 'edit';
   initialData?: Partial<Trip> & { trip_stops?: TripStop[], trip_photos?: TripPhoto[], trip_days?: TripDay[] };
   isAdmin?: boolean;
+  externalSuccess?: boolean; // Add this line to handle redirects
 };
 
 type ItineraryBlock = {
@@ -55,11 +56,27 @@ type ItineraryDay = {
   blocks: ItineraryBlock[];
 };
 
-export default function ShareTripForm({ returnTo, userProfile, mode = 'create', initialData, isAdmin = false }: ShareTripFormProps) {
+export default function ShareTripForm({ 
+  returnTo, 
+  userProfile, 
+  mode = 'create', 
+  initialData, 
+  isAdmin = false,
+  externalSuccess = false // Add default value
+}: ShareTripFormProps) {
   const router = useRouter();
   const supabase = createClient();
 
   const isEdit = mode === 'edit';
+
+  // Initialize and synchronize with external success parameters from the page router
+  const [isSuccess, setIsSuccess] = useState(externalSuccess);
+
+  React.useEffect(() => {
+    if (externalSuccess) {
+      setIsSuccess(true);
+    }
+  }, [externalSuccess]);
 
   // Section 1
   const [tripName, setTripName] = useState(initialData?.trip_name || '');
@@ -297,7 +314,6 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
   // Submission State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
   const [newTripId, setNewTripId] = useState<string | null>(null);
   const [showGuidelines, setShowGuidelines] = useState(false);
 
@@ -656,17 +672,21 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         });
 
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to update trip.');
-        }
+                      const errorData = await res.json();
+                      throw new Error(errorData.error || 'Failed to update trip.');
+                    }
 
-        clearDraft();
-        router.push(`/trip/${initialData.id}`);
-        router.refresh();
-        return;
-      }
-      
-      console.log('--- DEBUG: INSERTING TRIP PAYLOAD ---', payload);
+                    clearDraft();
+                    setNewTripId(initialData.id || null);
+                    
+                    // Route to the edit view with the success query parameter before completing local state
+                    router.push(`/trip/${initialData.id}/edit?success=true`);
+                    setIsSuccess(true);
+                    window.scrollTo(0, 0);
+                    return;
+                  }
+                  
+                  console.log('--- DEBUG: INSERTING TRIP PAYLOAD ---', payload);
       
       const { data: tripData, error: tripError } = await supabase.from('trips').insert(payload).select().single();
 
@@ -775,7 +795,7 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
           </p>
         </div>
         <h2 className="font-brand font-black text-3xl mb-4 text-accent-green">
-          {isPublic ? 'Trip Submitted!' : 'Draft Saved!'}
+          {isPublic ? (isEdit ? 'Trip Updated!' : 'Trip Submitted!') : (isEdit ? 'Draft Updated!' : 'Draft Saved!')}
         </h2>
         
         {/* Matipid Score Section */}
@@ -791,11 +811,21 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
 
 
         <p className="text-lg font-bold mb-2">
-          {isPublic ? 'Your travel map has been updated with your new destination province.' : 'Your plan has been saved to your Locker.'}
+          {isPublic 
+            ? (isEdit ? 'Your trip updates have been saved successfully.' : 'Your travel map has been updated with your new destination province.') 
+            : 'Your plan has been saved to your Locker.'}
         </p>
         <p className="mb-6 max-w-md opacity-80 leading-relaxed text-sm">
           {isPublic ? (
-            <>Keep submitting trips to fill your map and gain bragging rights for how many places you've been!</>
+            isEdit ? (
+              initialData?.review_status === 'pending_edit' ? (
+                <>Your trip has been sent back for moderation/review before it is visible on the feed again.</>
+              ) : (
+                <>Your trip updates have been saved successfully and are now live!</>
+              )
+            ) : (
+              <>Keep submitting trips to fill your map and gain bragging rights for how many places you've been!</>
+            )
           ) : (
             <>This trip is 100% private to you in your Locker. You can view, edit, or publish it to the community feed whenever you are ready.</>
           )
@@ -803,10 +833,10 @@ export default function ShareTripForm({ returnTo, userProfile, mode = 'create', 
         </p>
         <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs sm:max-w-md mt-2">
           <PrimaryButton 
-            onClick={() => router.push(isPublic ? '/profile' : (returnTo || '/'))}
+            onClick={() => router.push(isEdit && newTripId ? `/trip/${newTripId}` : (isPublic ? '/profile' : (returnTo || '/')))}
             className="w-full text-center flex items-center justify-center py-3"
           >
-            {isPublic ? 'View My Map' : 'Return to Locker'}
+            {isEdit ? 'Back to Trip' : (isPublic ? 'View My Map' : 'Return to Locker')}
           </PrimaryButton>
           <SecondaryButton 
             onClick={() => router.push('/')}

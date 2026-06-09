@@ -123,7 +123,7 @@ export function TripCard({ trip, heroPhoto, userId, hostings = [] }: TripCardPro
           </div>
 
           {/* Primary Title (Trip Name or Destination Fallback) */}
-          <h3 className="font-display font-bold text-sm sm:text-base md:text-lg leading-tight text-primary line-clamp-1">
+          <h3 className="font-display font-bold text-sm sm:text-base md:text-lg leading-tight text-primary whitespace-normal break-words">
             {trip.trip_name ? trip.trip_name : trip.destination}
           </h3>
 
@@ -138,10 +138,10 @@ export function TripCard({ trip, heroPhoto, userId, hostings = [] }: TripCardPro
           </div>
 
           {/* Destination + Origin */}
-          <div className="flex items-center gap-1 text-[11px] sm:text-xs md:text-sm font-bold text-secondary min-w-0">
-            <MapPin className="w-3.5 h-3.5 shrink-0 text-secondary" />
-            <span>
-              {trip.destination} · From {originName}
+          <div className="flex items-start gap-1 text-[11px] sm:text-xs md:text-sm font-bold text-secondary min-w-0">
+            <MapPin className="w-3.5 h-3.5 shrink-0 text-secondary mt-0.5" />
+            <span className="whitespace-normal break-words leading-tight text-secondary">
+              {originName} <span className="text-accent-coral font-bold mx-0.5">to</span> <span className="text-primary font-bold">{trip.destination}</span>
             </span>
           </div>
 

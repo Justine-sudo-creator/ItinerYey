@@ -1,21 +1,28 @@
-import React from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import ShareTripForm from '@/components/submit/ShareTripForm';
-import { TripWithPhotos } from '@/app/profile/page';
-import Link from 'next/link';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditTripPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+type Props = {
+  params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
 
+export default async function EditTripPage({ params, searchParams }: Props) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // 1. Authentication Check
   if (!user) {
-    redirect(`/login?returnTo=/trip/${params.id}/edit`);
+    console.log('--- EDIT PAGE DEBUG: No user session found, redirecting to login ---');
+    redirect(`/login?returnTo=${encodeURIComponent(`/trip/${params.id}/edit`)}`);
   }
 
-  // Fetch the trip
+  // 2. Fetch Trip
   const { data: trip } = await supabase
     .from('trips')
     .select('*, trip_photos(*), trip_stops(*), trip_days(*)')
@@ -23,47 +30,44 @@ export default async function EditTripPage({ params }: { params: { id: string } 
     .single();
 
   if (!trip) {
-    return (
-      <div className="w-full flex justify-center py-20 px-4">
-        <div className="font-bold border-4 border-border-dark bg-surface p-8 shadow-hard text-center flex flex-col gap-4 max-w-lg">
-          <h2 className="text-2xl font-black uppercase tracking-tight">Trip Not Found</h2>
-          <p className="text-secondary font-medium">The trip you are trying to edit does not exist.</p>
-        </div>
-      </div>
-    );
+    console.log('--- EDIT PAGE DEBUG: Trip not found, redirecting to feed ---');
+    redirect('/');
   }
 
-  // Check admin
+  // 3. Admin / Ownership checks
   const adminEmailsStr = process.env.ADMIN_EMAILS || '';
   const adminEmails = adminEmailsStr.split(',').map(e => e.trim().toLowerCase());
   const isAdmin = user.email ? adminEmails.includes(user.email.toLowerCase()) : false;
+  const isOwner = trip.user_id === user.id;
 
-  if (trip.user_id !== user.id && !isAdmin) {
-    return (
-      <div className="w-full flex justify-center py-20 px-4">
-        <div className="font-bold border-4 border-border-dark bg-surface p-8 shadow-hard text-center flex flex-col gap-4 max-w-lg">
-          <h2 className="text-2xl font-black uppercase tracking-tight">Access Denied</h2>
-          <p className="text-secondary font-medium">You can&apos;t edit this trip.</p>
-          <Link href={`/trip/${params.id}`} className="text-accent-blue underline uppercase text-sm tracking-wide">
-            Back to Trip
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  console.log('--- EDIT PAGE DEBUG ---', {
+    tripId: trip.id,
+    userId: user.id,
+    tripOwnerId: trip.user_id,
+    isOwner,
+    isAdmin,
+    successParam: searchParams.success,
+  });
 
   // Fetch user profile
-  const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
+  const { data: profile } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  const isSuccess = searchParams.success === 'true';
 
   return (
-    <div className="w-full flex justify-center pt-6 pb-16 px-4">
-      <div className="w-full max-w-[800px]">
-        <ShareTripForm 
-          returnTo={`/trip/${params.id}`} 
-          userProfile={profile} 
-          mode="edit" 
-          initialData={trip as unknown as TripWithPhotos} 
+    <div className="w-full flex justify-center pb-16 pt-6 px-4">
+      <div className="w-full max-w-4xl">
+        <ShareTripForm
+          returnTo={`/trip/${trip.id}`}
+          userProfile={profile}
+          mode="edit"
+          initialData={trip as any}
           isAdmin={isAdmin}
+          externalSuccess={isSuccess}
         />
       </div>
     </div>

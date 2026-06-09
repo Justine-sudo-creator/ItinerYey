@@ -71,6 +71,20 @@ export function TripDetailView({
   
   const stops = trip.trip_stops || [];
 
+  // Helper to format raw database region strings into human-readable text
+  const formatRegionName = (reg: string | null | undefined) => {
+    if (!reg) return '';
+    let clean = reg.replace(/\s*\(.*?\)\s*/g, '').trim();
+    if (clean.includes(', ')) {
+      const parts = clean.split(', ');
+      if (parts.some(p => p.toLowerCase() === 'metro manila')) {
+        return 'Metro Manila';
+      }
+      return parts[parts.length - 1];
+    }
+    return clean;
+  };
+
   const [localHostings, setLocalHostings] = useState<(TripHosting & { users?: any; trip_hosting_members?: any[] })[]>(hostings);
   const [updatingHostingId, setUpdatingHostingId] = useState<string | null>(null);
   const [isDiscussionOpen, setIsDiscussionOpen] = useState(false);
@@ -552,7 +566,9 @@ export function TripDetailView({
                 <div className="flex flex-wrap items-center gap-1.5 text-secondary font-bold text-lg mb-3">
                   <MapPin className="w-5 h-5 text-secondary shrink-0" />
                   <span>{trip.destination}</span>
-                  <span className="text-secondary font-bold">· {trip.destination_region}</span>
+                  {trip.destination_region && !trip.destination.toLowerCase().includes(trip.destination_region.toLowerCase()) && (
+                    <span className="text-secondary font-bold">· {formatRegionName(trip.destination_region)}</span>
+                  )}
                 </div>
               </>
             ) : (
@@ -560,7 +576,9 @@ export function TripDetailView({
                 <h1 className="text-3xl md:text-4xl font-display font-bold text-primary mb-2 leading-tight">
                   {trip.destination}
                 </h1>
-                <p className="text-secondary font-bold text-lg mb-3">{trip.destination_region}</p>
+                {trip.destination_region && !trip.destination.toLowerCase().includes(trip.destination_region.toLowerCase()) && (
+                  <p className="text-secondary font-bold text-lg mb-3">{formatRegionName(trip.destination_region)}</p>
+                )}
               </>
             )}
 
@@ -568,38 +586,39 @@ export function TripDetailView({
             <div className="flex items-center gap-2 flex-wrap">
               {trip.is_public === false && <Badge label="Locker Draft" variant="warning" />}
               <Badge label={trip.trip_type} variant="info" />
-              {trip.travel_style && <Badge label={trip.travel_style} variant="warning" />}
+              {trip.travel_style && trip.travel_style.toLowerCase() !== 'not set' && trip.travel_style.toLowerCase() !== 'not_set' && (
+                <Badge label={trip.travel_style} variant="warning" />
+              )}
               {trip.submission_tier === 'Detailed Trip' && <Badge label="Detailed Trip" variant="success" />}
             </div>
           </div>
           
-          {/* Action Buttons Row - Wrapped and Compact on Mobile */}
-          <div className="flex flex-wrap gap-2 items-center w-full md:w-auto mt-3 md:mt-0">
-            {hasAccess && trip.is_public !== false && <HelpfulVoteButton tripId={trip.id} initialHelpfulCount={trip.helpful_count || 0} userId={userId} tripOwnerId={trip.user_id} />}
-            {hasAccess && trip.is_public !== false && <SaveTripButton tripId={trip.id} initialSaved={initialSaved} userId={userId} initialSaveCount={trip.save_count || 0} tripOwnerId={trip.user_id} />}
-            
-            {(trip.user_id === userId || isAdmin) && (
-              <button 
-                onClick={() => router.push(`/trip/${trip.id}/edit`)}
-                className={`px-2 py-1.5 text-[10px] md:px-3 md:py-2 md:text-xs font-bold uppercase tracking-wide border-2 border-border-dark shadow-hard-sm hover:translate-y-1 hover:shadow-none transition-all ${trip.is_public === false ? 'bg-primary text-white' : 'bg-accent-yellow'}`}
-              >
-                {trip.is_public === false ? 'Publish to Feed' : 'Edit Trip'}
-              </button>
-            )}
-            
+          {/* Action Row Split: Community Engagement Indicators (Isolated from Owner Commands) */}
+          {trip.is_public !== false && (
+            <div className="flex items-center gap-3 border-b-2 border-border-dark/10 pb-3 mb-2 w-full">
+              <HelpfulVoteButton tripId={trip.id} initialHelpfulCount={trip.helpful_count || 0} userId={userId} tripOwnerId={trip.user_id} />
+              <SaveTripButton tripId={trip.id} initialSaved={initialSaved} userId={userId} initialSaveCount={trip.save_count || 0} tripOwnerId={trip.user_id} />
+            </div>
+          )}
+
+          {/* Action Row Split: Navigation Commands Container */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2">
+            {/* Primary Call-to-Action: Remix Trip */}
             {trip.is_public !== false && (
               <button 
                 onClick={handleRemix}
                 disabled={isRemixing}
-                className="px-2 py-1.5 text-[10px] md:px-3 md:py-2 md:text-xs font-bold uppercase tracking-wide border-2 border-border-dark bg-accent-blue text-white shadow-hard-sm hover:translate-y-1 hover:shadow-none disabled:opacity-50 transition-all"
+                className="flex-1 md:flex-none px-3 py-2 text-[10px] sm:text-xs md:text-sm font-black uppercase tracking-wide border-2 border-border-dark bg-accent-blue text-white shadow-hard-sm hover:translate-y-0.5 hover:shadow-none disabled:opacity-50 transition-all text-center"
               >
                 {isRemixing ? 'Remixing...' : 'Remix Trip'}
               </button>
             )}
+
+            {/* Secondary Call-to-Action: Host a Meetup */}
             {trip.is_public !== false && trip.is_approved && (
               <button 
                 onClick={() => router.push(`/trip/${trip.id}/host`)}
-                className={`px-2 py-1.5 text-[10px] md:px-3 md:py-2 md:text-xs font-bold uppercase tracking-wide border-2 border-border-dark shadow-hard-sm hover:translate-y-1 hover:shadow-none transition-all ${
+                className={`flex-1 md:flex-none px-3 py-2 text-[10px] sm:text-xs md:text-sm font-black uppercase tracking-wide border-2 border-border-dark shadow-hard-sm hover:translate-y-0.5 hover:shadow-none transition-all text-center ${
                   localHostings.length > 0
                     ? 'bg-white text-primary hover:bg-soft-beige'
                     : 'bg-accent-coral text-white'
@@ -608,14 +627,27 @@ export function TripDetailView({
                 Host a Meetup
               </button>
             )}
+
+            {/* Tertiary Action: Google Maps */}
             <a 
               href={generateGoogleMapsUrl()} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-2 py-1.5 text-[10px] md:px-3 md:py-2 md:text-xs font-bold uppercase tracking-wide border-2 border-border-dark bg-accent-blue text-white shadow-hard-sm hover:translate-y-1 hover:shadow-none transition-all"
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1 px-3 py-2 text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wide border-2 border-border-dark bg-white hover:bg-soft-beige text-primary shadow-hard-xs hover:translate-y-0.5 transition-all text-center"
             >
-              <MapPin className="w-4 h-4 shrink-0" /> Open in Google Maps
+              <MapPin className="w-3.5 h-3.5 shrink-0 text-accent-blue" />
+              <span>Google Maps</span>
             </a>
+
+            {/* Isolated Owner Commands: Edit/Publish */}
+            {(trip.user_id === userId || isAdmin) && (
+              <button 
+                onClick={() => router.push(`/trip/${trip.id}/edit`)}
+                className="flex-1 md:flex-none px-3 py-2 text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wide border-2 border-border-dark bg-white hover:bg-soft-beige text-primary shadow-hard-xs hover:translate-y-0.5 transition-all text-center"
+              >
+                {trip.is_public === false ? 'Publish' : 'Edit'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -635,7 +667,21 @@ export function TripDetailView({
             <p className="text-xs font-bold uppercase text-secondary">Duration</p>
             <p className="font-bold text-lg">
               {trip.trip_duration_label ? (
-                <>{trip.trip_duration_label} <span className="text-sm font-normal text-secondary ml-1">· {trip.duration_days} day{trip.duration_days !== 1 ? 's' : ''}</span></>
+                <>
+                  {trip.trip_duration_label}
+                  {/* Avoid appending contradicting day counts next to sub-day estimations */}
+                  {![
+                    '1–2 hours',
+                    '2–3 hours',
+                    'Half-day',
+                    'Whole day',
+                    'Night trip'
+                  ].includes(trip.trip_duration_label) && (
+                    <span className="text-sm font-normal text-secondary ml-1">
+                      · {trip.duration_days} day{trip.duration_days !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </>
               ) : (
                 `${trip.duration_days} Day${trip.duration_days !== 1 ? 's' : ''}`
               )}

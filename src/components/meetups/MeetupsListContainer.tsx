@@ -346,13 +346,13 @@ export function MeetupsListContainer({
 
                   {/* Destination */}
                   <div className="min-w-0">
-                    <h3 className="font-display font-black text-xs sm:text-sm md:text-lg text-primary leading-tight line-clamp-1">
+                    <h3 className="font-display font-black text-xs sm:text-sm md:text-lg text-primary leading-tight whitespace-normal break-words">
                       {trip.trip_name || trip.destination}
                     </h3>
-                    <div className="flex items-center gap-0.5 md:gap-1 text-[9px] sm:text-xs font-bold text-secondary mt-0.5 min-w-0">
-                      <MapPin size={10} className="shrink-0 text-secondary" />
-                      <span className="truncate">
-                        {trip.destination} · From {originCity}
+                    <div className="flex items-start gap-0.5 md:gap-1 text-[9px] sm:text-xs font-bold text-secondary mt-0.5 min-w-0">
+                      <MapPin size={10} className="shrink-0 text-secondary mt-0.5" />
+                      <span className="whitespace-normal break-words leading-tight text-secondary">
+                        {originCity} <span className="text-accent-coral font-bold mx-0.5">to</span> <span className="text-primary font-bold">{trip.destination}</span>
                       </span>
                     </div>
                   </div>
