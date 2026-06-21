@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowseFeed } from '@/components/feed/BrowseFeed';
+import { BrowseRoutes } from '@/components/feed/BrowseRoutes';
 import { PrimaryButton } from '@/components/ui/Button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Chips';
@@ -12,12 +12,12 @@ export default function Home() {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <h1 className="text-3xl md:text-4xl font-display font-bold text-primary leading-tight">
-              Browse Trips
+              Commute Routes
             </h1>
-            <Badge label="COMMUNITY TRAVEL BOARD" variant="warning" className="hidden sm:inline-block ml-2" />
+            <Badge label="CROWD-SOURCED COMMUTE GUIDE" variant="warning" className="hidden sm:inline-block ml-2" />
           </div>
-          <p className="text-secondary font-medium">
-            Gusto mo bang gumala on a budget? See actual spend, routes, itineraries, and tips shared by our community.
+          <p className="text-secondary font-medium max-w-2xl">
+            Never get lost commuting again. Search verified public transport routes, accurate fares, and precise boarding points updated by daily commuters.
           </p>
         </div>
         
@@ -25,14 +25,14 @@ export default function Home() {
         <div className="shrink-0">
           <Link href="/submit">
             <PrimaryButton className="text-xs sm:text-sm md:text-base py-2.5 px-4 md:py-3 md:px-6">
-              Share Your Trip
+              Add Route
             </PrimaryButton>
           </Link>
         </div>
       </div>
       
       {/* Feed Area */}
-      <BrowseFeed />
+      <BrowseRoutes />
     </div>
   );
 }

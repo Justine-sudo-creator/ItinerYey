@@ -79,7 +79,7 @@ export default function SignupPage() {
 
         const urlParams = new URLSearchParams(window.location.search);
         const returnTo = urlParams.get('returnTo');
-        router.push(returnTo || '/onboarding');
+        router.push(returnTo || '/');
       }
     } catch (err: unknown) {
       setError((err as Error).message || 'An error occurred during signup.');
@@ -94,7 +94,11 @@ export default function SignupPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+            typeof window !== 'undefined'
+              ? new URLSearchParams(window.location.search).get('returnTo') || '/'
+              : '/'
+          )}`,
         },
       });
 

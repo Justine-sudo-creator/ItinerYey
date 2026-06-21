@@ -3,7 +3,6 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { AccessBanner } from "@/components/layout/AccessBanner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -13,7 +12,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "ItinerYey",
-  description: "A mobile-first web app for trip itineraries",
+  description: "Crowd-sourced commute routes for daily travelers",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.svg",
@@ -32,7 +31,6 @@ export default function RootLayout({
       >
         <div className="flex flex-col min-h-screen relative">
           <AppHeader />
-          <AccessBanner />
           <div className="flex-1 w-full flex flex-col items-center">
             <PageContainer className="flex-1 flex flex-col w-full">
               {children}

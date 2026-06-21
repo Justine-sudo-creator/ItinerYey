@@ -47,7 +47,9 @@ export default function LoginPage() {
 
       if (authError) throw authError;
 
-      router.push('/');
+      const urlParams = new URLSearchParams(window.location.search);
+      const returnTo = urlParams.get('returnTo');
+      router.push(returnTo || '/');
       router.refresh();
     } catch (err: unknown) {
       setError((err as Error).message || 'An error occurred during login.');
@@ -62,7 +64,11 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+            typeof window !== 'undefined'
+              ? new URLSearchParams(window.location.search).get('returnTo') || '/'
+              : '/'
+          )}`,
         },
       });
 
@@ -128,7 +134,17 @@ export default function LoginPage() {
         </SecondaryButton>
 
         <p className="mt-6 text-sm text-secondary text-center font-bold">
-          Don&apos;t have an account? <Link href="/signup" className="text-primary underline hover:text-accent-blue">Sign up here</Link>
+          Don&apos;t have an account?{' '}
+          <Link
+            href={
+              typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('returnTo')
+                ? `/signup?returnTo=${encodeURIComponent(new URLSearchParams(window.location.search).get('returnTo')!)}`
+                : '/signup'
+            }
+            className="text-primary underline hover:text-accent-blue"
+          >
+            Sign up here
+          </Link>
         </p>
       </RetroPanel>
     </div>

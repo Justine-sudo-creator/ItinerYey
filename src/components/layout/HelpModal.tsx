@@ -40,148 +40,114 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
 
   const faqs = [
     {
-      question: "What is a Vouch?",
-      answer: "A vouch is a vote of confidence from other travelers. It shows that they have met you, traveled with you, or found your shared itineraries highly accurate. More vouches build your credibility index, making other travelers more confident to join your hosted meetups."
+      question: 'Do I need an account to browse routes?',
+      answer: 'No. Anyone can search and view commute routes without signing in. You only need an account to submit routes, verify fares, or manage your contributions.',
     },
     {
-      question: "How is my trip's helpfulness score calculated?",
-      answer: "Your trip completeness or helpfulness score is calculated dynamically based on details provided. Uploading photos adds 20%, writing honest warnings adds 20%, sharing travel tips adds 20%, itemizing costs adds 20%, and scheduling meetups/day itineraries adds the rest. Detailed trips look premium in the feed!"
+      question: 'How do I submit a commute route?',
+      answer: 'Sign in, go to Submit, pin your origin and destination on the map, add each transport segment with boarding/drop-off landmarks, and publish. Your route goes live immediately — no admin approval needed.',
     },
     {
-      question: "What is the difference between a Detailed Guide and a Budget Snapshot?",
-      answer: "Detailed Guides are comprehensive trip itineraries with photos, tips, itemized costs, and structured timelines. They are marked with a green checkmark icon in the feed. Budget Snapshots are minimalist guides that focus purely on the baseline cost and location details, marked with a gray dot icon."
+      question: 'How can I edit or delete my routes?',
+      answer: 'Open your Profile tab to see all routes you submitted. Use Edit to update segments, fares, or tips. Use Delete to remove a route permanently.',
     },
     {
-      question: "Are meetup coordinates secure?",
-      answer: "Yes, when you join a meetup, you gain access to the coordination board. The host can provide detailed meeting points, coordinates, and exact schedules, which are only viewable by accepted participants."
+      question: 'What does the confidence score mean?',
+      answer: 'The confidence score reflects recent community feedback. When commuters confirm a route is still accurate, the score goes up. Reports of fare changes or invalid routes lower it.',
     },
     {
-      question: "How can I edit my submitted itineraries?",
-      answer: "Go to your Profile tab, click on any of your shared trips, and use the 'Edit' action at the top of the detail page to update budget items, descriptions, or change meetup info."
-    }
+      question: 'Why use Street View on stops?',
+      answer: 'Each boarding and drop-off point has a Street View button so you can visually confirm the landmark before or during your commute.',
+    },
   ];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
         className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300 animate-in fade-in"
       />
-      
-      {/* Modal Card */}
+
       <div className="relative w-full max-w-3xl max-h-[85vh] bg-soft-beige border-4 border-border-dark shadow-hard flex flex-col z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-        
-        {/* Modal Header */}
         <div className="flex items-center justify-between p-4 md:p-6 border-b-4 border-border-dark bg-accent-yellow">
           <div className="flex items-center gap-3">
             <span className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-border-dark bg-surface font-black text-sm shadow-hard-sm">?</span>
-            <h2 className="text-xl md:text-2xl font-black font-display tracking-tight text-primary uppercase">How It Works & FAQ</h2>
+            <h2 className="text-xl md:text-2xl font-black font-display tracking-tight text-primary uppercase">How It Works</h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="w-8 h-8 md:w-10 md:h-10 border-2 border-border-dark bg-surface shadow-hard-sm hover:translate-y-0.5 hover:shadow-none active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all flex items-center justify-center font-bold text-sm"
+            className="w-8 h-8 md:w-10 md:h-10 border-2 border-border-dark bg-surface shadow-hard-sm hover:translate-y-0.5 hover:shadow-none transition-all flex items-center justify-center font-bold text-sm"
             aria-label="Close modal"
           >
             ✕
           </button>
         </div>
 
-        {/* Modal Body (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 select-text">
-          
-          {/* Section 1: Core Mechanics */}
           <div>
             <h3 className="text-base md:text-lg font-black font-display text-primary uppercase tracking-wider mb-4 border-b-2 border-border-dark pb-1">
-              Core Platform Mechanics
+              How ItinerYey Works
             </h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Card 1: Trip Tiers */}
               <div className="border-2 border-border-dark bg-surface p-4 shadow-hard-sm flex flex-col gap-2">
-                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-[#10B981] text-white border border-border-dark shadow-[1px_1px_0px_#000]">
-                    ✓ Detailed Guide
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-white text-gray-400 border border-border-dark shadow-[1px_1px_0px_#000]">
-                    • Snapshot
-                  </span>
-                </div>
-                <h4 className="font-bold text-sm md:text-base text-primary">Visual Trip Tiers</h4>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-accent-coral text-primary border border-border-dark rounded-sm w-fit">
+                  Browse
+                </span>
+                <h4 className="font-bold text-sm md:text-base text-primary">Find Routes</h4>
                 <p className="text-xs text-primary/80 leading-relaxed font-semibold">
-                  Submit comprehensive guides with photos, tips, and itemized costs to unlock the premium green checkmark **Detailed Guide** icon. Basic submissions appear as **Budget Snapshots** with a gray dot.
+                  Search crowd-sourced commute routes with fares, boarding points, and step-by-step breakdowns.
                 </p>
               </div>
-
-              {/* Card 2: Vouch System */}
               <div className="border-2 border-border-dark bg-surface p-4 shadow-hard-sm flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-accent-coral text-primary border border-border-dark rounded-sm">
-                    Vouches
-                  </span>
-                </div>
-                <h4 className="font-bold text-sm md:text-base text-primary">Trust & Credibility</h4>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-accent-yellow text-primary border border-border-dark rounded-sm w-fit">
+                  Submit
+                </span>
+                <h4 className="font-bold text-sm md:text-base text-primary">Share Your Commute</h4>
                 <p className="text-xs text-primary/80 leading-relaxed font-semibold">
-                  Get vouched by other users on your profile page to grow your credibility score. Highly vouched members receive badges and gain priority when coordinating group meetups.
+                  Log in and publish routes instantly. Pin landmarks on the map so others know exactly where to board.
                 </p>
               </div>
-
-              {/* Card 3: Meetups */}
               <div className="border-2 border-border-dark bg-surface p-4 shadow-hard-sm flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-accent-blue text-primary border border-border-dark rounded-sm">
-                    Meetups
-                  </span>
-                </div>
-                <h4 className="font-bold text-sm md:text-base text-primary">Coordinate Trips</h4>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-green-600 text-white border border-border-dark rounded-sm w-fit">
+                  Verify
+                </span>
+                <h4 className="font-bold text-sm md:text-base text-primary">Keep Routes Accurate</h4>
                 <p className="text-xs text-primary/80 leading-relaxed font-semibold">
-                  Create public or private meetups on top of itineraries. Discuss meeting coordinates, passenger count, and schedules inside the coordination board.
+                  Took this route recently? Confirm it&apos;s still valid or flag fare and boarding changes.
                 </p>
               </div>
-
-              {/* Card 4: Badges */}
               <div className="border-2 border-border-dark bg-surface p-4 shadow-hard-sm flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-accent-yellow text-primary border border-border-dark rounded-sm">
-                    Badges
-                  </span>
-                </div>
-                <h4 className="font-bold text-sm md:text-base text-primary">Earn Reputation</h4>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-accent-blue text-primary border border-border-dark rounded-sm w-fit">
+                  Profile
+                </span>
+                <h4 className="font-bold text-sm md:text-base text-primary">Manage Your Routes</h4>
                 <p className="text-xs text-primary/80 leading-relaxed font-semibold">
-                  Unlock achievements such as **Local Explorer**, **Budget Guru**, and **Super Host** based on how helpful your itineraries are and how active you are in the community.
+                  Edit or delete routes you submitted. Get notified when others leave feedback on your routes.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Section 2: Expandable FAQs */}
           <div>
             <h3 className="text-base md:text-lg font-black font-display text-primary uppercase tracking-wider mb-4 border-b-2 border-border-dark pb-1">
               Frequently Asked Questions
             </h3>
             <div className="space-y-1">
               {faqs.map((faq, index) => (
-                <FAQAccordionItem 
-                  key={index}
-                  question={faq.question}
-                  answer={faq.answer}
-                />
+                <FAQAccordionItem key={index} question={faq.question} answer={faq.answer} />
               ))}
             </div>
           </div>
-
         </div>
 
-        {/* Modal Footer */}
         <div className="p-4 border-t-2 border-border-dark bg-surface flex justify-end gap-3">
-          <button 
+          <button
             onClick={onClose}
-            className="text-xs font-bold uppercase tracking-wider border-2 border-border-dark px-4 py-2 bg-accent-coral text-primary shadow-hard-sm hover:translate-y-0.5 hover:shadow-none active:translate-y-[2px] active:translate-x-[2px] active:shadow-none transition-all"
+            className="text-xs font-bold uppercase tracking-wider border-2 border-border-dark px-4 py-2 bg-accent-coral text-primary shadow-hard-sm hover:translate-y-0.5 hover:shadow-none transition-all"
           >
             Got it, thanks!
           </button>
         </div>
-
       </div>
     </div>
   );

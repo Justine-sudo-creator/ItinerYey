@@ -33,173 +33,64 @@ export type ProfileVerification = {
   created_at: string
 }
 
-export type TripHosting = {
-  id: string
-  trip_id: string
-  host_user_id: string
-  target_date: string
-  slots_needed: number
-  contact_link: string
-  host_note: string | null
-  status: 'open' | 'full' | 'archived' | 'expired' | 'canceled'
-  hosting_tier: 'standard' | 'pro'
-  is_boosted: boolean
-  boost_reference: string | null
-  boost_status: 'none' | 'pending' | 'approved' | 'rejected'
-  listing_reference: string | null
-  listing_status: 'free' | 'pending' | 'approved' | 'rejected'
-  cancellation_reason?: string | null
-  boosted_at?: string | null
-  created_at: string
-  
-  users?: {
-    display_name: string | null
-    avatar_url: string | null
-    is_verified_organizer: boolean
-  }
-}
-
-export type TripHostingMember = {
-  id: string
-  hosting_id: string
-  user_id: string
-  status: 'pending' | 'approved' | 'rejected'
-  created_at: string
-  users?: {
-    display_name: string | null
-    avatar_url: string | null
-    vouch_count: number | null
-    is_verified_organizer: boolean
-  }
-}
-
-export type TripHostingMessage = {
-    id: string
-    hosting_id: string
-    user_id: string
-    content: string
-    is_pinned: boolean
-    reply_to_id: string | null
-    created_at: string
-    users?: {
-      display_name: string | null
-      avatar_url: string | null
-      is_verified_organizer: boolean
-    }
-    parent?: {
-      content: string
-      user_id?: string | null
-      users?: {
-        display_name: string | null
-      }
-    } | null
-  }
-
-export type TripPriceSuggestion = {
-  id: string
-  trip_id: string
-  suggested_by_user_id: string
-  category: 'Transport' | 'Food' | 'Activities' | 'Accommodation'
-  suggested_amount: number
-  reason: string
-  status: 'pending' | 'approved' | 'rejected'
-  created_at: string
-  users?: {
-    display_name: string | null
-    avatar_url: string | null
-  }
-}
-
-export type Trip = {
+export type Route = {
   id: string
   user_id: string
+  origin: string
   destination: string
-  trip_name?: string | null
-  destination_region: string
-  origin_region: string
-  destination_place_id: string | null
-  destination_lat: number | null
-  destination_lng: number | null
-  destination_city: string | null
-  destination_province: string | null
-  destination_country: string | null
-  origin_place_id: string | null
   origin_lat: number | null
   origin_lng: number | null
-  origin_city: string | null
-  origin_province: string | null
-  origin_country: string | null
-  origin_area: string | null
-  end_area: string | null
-  route_context: string | null
-  travel_date: string
-  group_size: number
-  group_type: string
-  trip_type: string
-  duration_days: number
-  trip_duration_label?: string | null
-  cost_per_person: number
-  cost_scope?: 'individual' | 'group_total' | null
-  transport_cost: number | null
-  transport_cost_scope?: string | null
-  food_cost: number | null
-  activities_cost: number | null
-  accommodation_cost: number | null
-  detailed_costs: { id: string; category: string; label: string; amount: string }[] | null
-  tip: string | null
-  honest_warning: string | null
-  would_return: boolean
-  travel_style: string
-  submission_tier: string
-  view_count: number
-  save_count: number
-  helpful_count: number
-  trip_summary: string | null
-  is_approved: boolean
-  review_status?: string | null
-  is_public: boolean
-  is_curated?: boolean
-  attribution_source?: string | null
-  claimed_by?: string | null
-  claim_request_by?: string | null
-  claim_proof?: string | null
+  destination_lat: number | null
+  destination_lng: number | null
+  travel_date_month: number | null
+  travel_date_year: number | null
+  estimated_duration: string | null
+  total_fare: number
+  community_notes: string | null
+  destination_tip: string | null
+  last_verified_at: string
+  confidence_score: number
   created_at: string
-  trip_stops?: TripStop[]
-  trip_days?: TripDay[]
+  /** Present only when returned by browse_routes_filtered RPC */
+  total_count?: number
   users?: {
     display_name: string | null
     avatar_url: string | null
   }
 }
 
-export type TripDay = {
+export type RouteSegment = {
   id: string
-  trip_id: string
-  day_number: number
-  time_of_day: string
-  activity: string
-  cost: number | null
+  route_id: string
+  transport_type: string
+  signboard: string | null
+  fare: number
+  boarding_name: string | null
+  boarding_lat: number | null
+  boarding_lng: number | null
+  drop_off_name: string | null
+  drop_off_lat: number | null
+  drop_off_lng: number | null
+  boarding_tip: string | null
+  drop_off_tip: string | null
+  estimated_duration: string | null
+  photo_url: string | null
   display_order: number
-}
-
-export type TripStop = {
-  id: string
-  trip_id: string
-  stop_name: string
-  stop_note: string | null
-  display_order: number
-  lat: number | null
-  lng: number | null
   created_at: string
 }
 
-export type TripPhoto = {
+export type RouteVerification = {
   id: string
-  trip_id: string
-  photo_url: string
-  caption: string | null
-  is_hero: boolean
-  display_order: number
+  route_id: string
+  user_id: string | null
+  verification_type: 'accurate' | 'fare_changed' | 'boarding_point_changed' | 'unavailable'
+  new_fare: number | null
+  notes: string | null
+  created_at: string
+  users?: {
+    display_name: string | null
+    avatar_url: string | null
+  }
 }
 
 export type Business = {
@@ -215,38 +106,6 @@ export type Business = {
   feature_start: string | null
   feature_end: string | null
 }
-
-export type SavedTrip = {
-  id: string
-  user_id: string
-  trip_id: string
-  saved_at: string
-}
-
-export type TripHelpfulVote = {
-  trip_id: string
-  user_id: string
-  created_at: string
-}
-
-export type TripComment = {
-    id: string
-    trip_id: string
-    user_id: string
-    content: string
-    reply_to_id: string | null
-    created_at: string
-    users?: {
-      display_name: string | null
-      avatar_url: string | null
-    }
-    parent?: {
-      content: string
-      users?: {
-        display_name: string | null
-      }
-    } | null
-  }
 
 export type Notification = {
   id: string
@@ -273,28 +132,22 @@ export interface Database {
         Update: Partial<User>
         Relationships: []
       }
-      trips: {
-        Row: Trip
-        Insert: Partial<Trip>
-        Update: Partial<Trip>
+      routes: {
+        Row: Route
+        Insert: Partial<Route>
+        Update: Partial<Route>
         Relationships: []
       }
-      trip_days: {
-        Row: TripDay
-        Insert: Partial<TripDay>
-        Update: Partial<TripDay>
+      route_segments: {
+        Row: RouteSegment
+        Insert: Partial<RouteSegment>
+        Update: Partial<RouteSegment>
         Relationships: []
       }
-      trip_photos: {
-        Row: TripPhoto
-        Insert: Partial<TripPhoto>
-        Update: Partial<TripPhoto>
-        Relationships: []
-      }
-      trip_stops: {
-        Row: TripStop
-        Insert: Partial<TripStop>
-        Update: Partial<TripStop>
+      route_verifications: {
+        Row: RouteVerification
+        Insert: Partial<RouteVerification>
+        Update: Partial<RouteVerification>
         Relationships: []
       }
       businesses: {
@@ -303,52 +156,10 @@ export interface Database {
         Update: Partial<Business>
         Relationships: []
       }
-      saved_trips: {
-        Row: SavedTrip
-        Insert: Partial<SavedTrip>
-        Update: Partial<SavedTrip>
-        Relationships: []
-      }
-      trip_helpful_votes: {
-        Row: TripHelpfulVote
-        Insert: Partial<TripHelpfulVote>
-        Update: Partial<TripHelpfulVote>
-        Relationships: []
-      }
-      trip_comments: {
-        Row: TripComment
-        Insert: Partial<TripComment>
-        Update: Partial<TripComment>
-        Relationships: []
-      }
       profile_verifications: {
         Row: ProfileVerification
         Insert: Partial<ProfileVerification>
         Update: Partial<ProfileVerification>
-        Relationships: []
-      }
-      trip_hosting: {
-        Row: TripHosting
-        Insert: Partial<TripHosting>
-        Update: Partial<TripHosting>
-        Relationships: []
-      }
-      trip_hosting_members: {
-        Row: TripHostingMember
-        Insert: Partial<TripHostingMember>
-        Update: Partial<TripHostingMember>
-        Relationships: []
-      }
-      trip_hosting_messages: {
-        Row: TripHostingMessage
-        Insert: Partial<TripHostingMessage>
-        Update: Partial<TripHostingMessage>
-        Relationships: []
-      }
-      trip_price_suggestions: {
-        Row: TripPriceSuggestion
-        Insert: Partial<TripPriceSuggestion>
-        Update: Partial<TripPriceSuggestion>
         Relationships: []
       }
       notifications: {
@@ -367,6 +178,16 @@ export interface Database {
           target_user_id: string
         }
         Returns: undefined
+      }
+      browse_routes_filtered: {
+        Args: {
+          transport_types?: string[] | null
+          min_confidence?:  number   | null
+          search_text?:     string
+          page_offset?:     number
+          page_limit?:      number
+        }
+        Returns: (Route & { total_count: number })[]
       }
     }
     Enums: {

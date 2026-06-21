@@ -77,20 +77,13 @@ export function AppHeader() {
   };
 
   const navLinks = [
-    { href: '/', label: 'Feed' },
-    { href: '/meetups', label: 'Meetups' },
-    { href: '/submit', label: 'Submit' },
+    { href: '/',        label: 'Feed'    },
+    { href: '/planner', label: 'Planner' },
+    { href: '/submit',  label: 'Submit'  },
     { href: '/profile', label: 'Profile' },
   ];
 
-  // For MVP client-side rendering hide/show. Real security is enforced server-side.
-  const adminEmailsStr = process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'justinemationg12@gmail.com'; // fallback if they only set the private one
-  const adminEmails = adminEmailsStr.split(',').map(e => e.trim().toLowerCase());
-  const isAdmin = user?.email && adminEmails.includes(user.email.toLowerCase());
-
-  if (isAdmin) {
-    navLinks.push({ href: '/admin', label: 'Admin' });
-  }
+  // Admin nav removed — routes publish immediately without approval
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between w-full h-16 px-4 md:px-8 bg-soft-beige border-b-2 border-border-dark">

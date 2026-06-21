@@ -58,50 +58,28 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // If user is logged in, enforce onboarding check server-side
-  if (user) {
-    const isExcludedPath = [
-      '/onboarding',
-      '/login',
-      '/signup',
-      '/api',
-      '/_next'
-    ].some(route => request.nextUrl.pathname.startsWith(route))
+  const protectedRoutes = ['/profile', '/submit']
+  const isProtectedRoute = protectedRoutes.some(route =>
+    request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route + '/')
+  )
 
-    if (!isExcludedPath) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('region, travel_style, typical_budget')
-        .eq('id', user.id)
-        .single()
+  const isEditRoute = /^\/route\/[^/]+\/edit/.test(request.nextUrl.pathname)
 
-      if (profile && (!profile.region || !profile.travel_style || !profile.typical_budget)) {
-        const url = request.nextUrl.clone()
-        url.pathname = '/onboarding'
-        return NextResponse.redirect(url)
-      }
-    }
-  }
-
-  // protected routes (submit is excluded here so SubmitPage page-level logic handles it with returnTo query support)
-  const protectedRoutes = ['/onboarding', '/saved', '/profile']
-  const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
-
-
-  if (isProtectedRoute && !user) {
-    // redirect to login
+  if ((isProtectedRoute || isEditRoute) && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('returnTo', request.nextUrl.pathname + request.nextUrl.search)
     return NextResponse.redirect(url)
   }
 
-  // If trying to access auth pages while logged in, redirect to home
   const authRoutes = ['/login', '/signup']
   const isAuthRoute = authRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
   if (isAuthRoute && user) {
+    const returnTo = request.nextUrl.searchParams.get('returnTo')
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = returnTo && returnTo.startsWith('/') ? returnTo : '/'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

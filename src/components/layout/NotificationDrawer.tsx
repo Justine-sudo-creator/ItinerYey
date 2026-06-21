@@ -53,6 +53,8 @@ function getBatchedNotifications(rawNotifications: Notification[]): BatchedNotif
     // Batch rules
     if (notif.type === 'vouch_received') {
       groupKey = 'vouch_received';
+    } else if (notif.type === 'route_feedback' && notif.link) {
+      groupKey = `route_feedback:${notif.link}`;
     } else if (notif.type === 'trip_like' && notif.link) {
       groupKey = `trip_like:${notif.link}`;
     } else if (notif.type === 'meetup_join_request' && notif.link) {
@@ -126,6 +128,9 @@ function getBatchedNotifications(rawNotifications: Notification[]): BatchedNotif
       const destMatch = primary.message.match(/to\s+([^!]+)/i);
       const dest = destMatch ? destMatch[1].trim() : 'your itinerary';
       message = `${actorText} liked and saved your trip to ${dest}!`;
+    } else if (primary.type === 'route_feedback') {
+      title = 'Route Feedback';
+      message = primary.message;
     } else if (primary.type === 'meetup_join_request') {
       title = 'New Join Requests';
       message = `${actorText} requested to join your meetup.`;
@@ -308,12 +313,12 @@ export function NotificationDrawer({ isOpen, onClose }: NotificationDrawerProps)
             <div className="flex flex-col items-center justify-center p-8 text-center gap-2 opacity-60 mt-12">
               <Inbox className="w-12 h-12 text-primary" strokeWidth={1.5} />
               <p className="font-bold text-sm">No notifications yet</p>
-              <p className="text-xs">When people vouch for you or join your meetups, you&apos;ll see it here.</p>
+              <p className="text-xs">When someone leaves feedback on your routes, you&apos;ll see it here.</p>
             </div>
           ) : (
             <div className="flex flex-col">
               {batchedNotifications.map((notif) => {
-                const isTransactional = ['meetup_join_request', 'new_message'].includes(notif.type);
+                const isTransactional = ['route_feedback', 'new_message'].includes(notif.type);
                 const isSocial = ['trip_like', 'vouch_received', 'badge_unlocked'].includes(notif.type);
                 
                 let highlightColor = 'bg-surface';
