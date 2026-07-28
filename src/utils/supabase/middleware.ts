@@ -55,8 +55,9 @@ export async function updateSession(request: NextRequest) {
   )
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: { session },
+  } = await supabase.auth.getSession()
+  const user = session?.user
 
   const protectedRoutes = ['/profile', '/submit']
   const isProtectedRoute = protectedRoutes.some(route =>
