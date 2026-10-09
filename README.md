@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ItinerYey — offline commute assistant
 
-## Getting Started
+ItinerYey is a crowd-sourced guide to Philippine public transport (jeepney, bus, UV Express, LRT/MRT). Commuters post the routes they ride, other commuters verify them, and an A* planner combines legs from different posts into one trip.
 
-First, run the development server:
+**Hackathon build: it keeps working when the cloud is gone.** Signal drops in MRT tunnels, on provincial roads and when prepaid data runs out, so the app does all of the following on the laptop itself:
+
+| Feature | Runs on | Cloud needed? |
+|---|---|---|
+| Taglish/English question → origin & destination | `qwen2.5:3b` via Ollama | No |
+| Place lookup (SM North → North Avenue MRT, …) | Local stop index + aliases | No (replaces Nominatim) |
+| Multi-vehicle route, fare, time | Existing A* engine on `data/offline/snapshot.json.gz` | No (Supabase optional) |
+| Signboard photo → matching routes, fare, "dadaan ba sa …?" | `qwen2.5vl:3b` via Ollama | No |
+
+The model only *understands* the question and *reads* signboards. Fares, stops and transfers always come from the planner, so the assistant cannot invent routes.
+
+## Run the offline demo
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Local models (one-time download, ~5 GB)
+ollama serve &
+ollama pull qwen2.5:3b
+ollama pull qwen2.5vl:3b
+
+# 2. App in offline mode (no Supabase keys needed)
+npm install
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=offline-demo \
+OFFLINE_MODE=1 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000/ask, then turn Wi-Fi off and try:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `Paano pumunta sa SM North galing Cubao?`
+- `Galing Recto papuntang Katipunan, magkano?`
+- **Scan signboard** → *Try sample signboard* (or upload/take a photo of a real jeepney sign)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Environment overrides: `OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_VISION_MODEL`, `ASSISTANT_REPHRASE=1` (let the LLM re-word directions; best with a 7B+ model).
 
-## Learn More
+## Offline route snapshot
 
-To learn more about Next.js, take a look at the following resources:
+`data/offline/snapshot.json.gz` ships with routes built from the [Sakay.ph GTFS feed](https://github.com/sakayph/gtfs) (1,717 routes). Rebuild it from your own Supabase data or a GTFS folder:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx tsx scripts/build_offline_snapshot.ts               # from Supabase (needs SUPABASE_SERVICE_ROLE_KEY)
+npx tsx scripts/build_offline_snapshot.ts --gtfs ./gtfs  # from a GTFS feed
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+With Supabase configured, the planner uses live data and falls back to the snapshot automatically if Supabase can't be reached.
 
-## Deploy on Vercel
+## Full (online) app
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Create `.env.local` with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` and `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`, then `npm run dev`.

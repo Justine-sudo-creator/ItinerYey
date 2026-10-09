@@ -84,11 +84,15 @@ export interface WalkingLeg {
 
 export type JourneyLeg = TransitLeg | WalkingLeg;
 
+/** 'live' = Supabase, 'offline' = on-device snapshot */
+export type DataSource = 'live' | 'offline';
+
 export interface RoutingResult {
   success: true;
   totalTimeMinutes: number;
   totalFare: number;
   legs: JourneyLeg[];
+  dataSource?: DataSource;
 }
 
 export interface RoutingError {

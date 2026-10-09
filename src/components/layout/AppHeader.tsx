@@ -79,6 +79,7 @@ export function AppHeader() {
   const navLinks = [
     { href: '/',        label: 'Feed'    },
     { href: '/planner', label: 'Planner' },
+    { href: '/ask',     label: 'Ask AI'  },
     { href: '/submit',  label: 'Submit'  },
     { href: '/profile', label: 'Profile' },
   ];

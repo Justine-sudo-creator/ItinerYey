@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createServiceClient } from '@/utils/supabase/service';
+import { loadOfflineSnapshot, isOfflineMode, type RawSegment } from '@/lib/offlineData';
 import type {
   GraphNode,
   GraphEdge,
@@ -21,6 +22,7 @@ import type {
   JourneyLeg,
   RoutingResult,
   RoutingError,
+  DataSource,
 } from '@/types/routing';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,6 +38,15 @@ const WALK_SPEED_M_PER_MIN = 80;
 /** A* heuristic divisor — optimistic average transit speed (m/min)
  *  ~250 m/min ≈ 15 km/h, reasonable for mixed urban transit */
 const HEURISTIC_SPEED_M_PER_MIN = 250;
+
+/** Minimum (flag-down) fare per ride, so boarding mid-route is never ₱0 */
+const MIN_FARE: Record<string, number> = {
+  jeep: 14, bus: 15, 'uv express': 18, lrt: 15, mrt: 13, tricycle: 15,
+};
+
+function minFare(transportType: string): number {
+  return MIN_FARE[transportType.toLowerCase()] ?? 0;
+}
 
 /** Extra minutes added whenever the vehicle line changes (transfer penalty) */
 const TRANSFER_PENALTY_MIN = 20;
@@ -119,20 +130,6 @@ class MinHeap {
 // Graph construction
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface RawSegment {
-  route_id: string;
-  transport_type: string;
-  signboard: string | null;
-  fare: number;
-  boarding_name: string | null;
-  boarding_lat: number | null;
-  boarding_lng: number | null;
-  drop_off_name: string | null;
-  drop_off_lat: number | null;
-  drop_off_lng: number | null;
-  estimated_duration: string | null;
-}
-
 function parseDurationMin(raw: string | null): number {
   if (!raw) return 3; // default 3 min per stop
   const match = raw.match(/\d+/);
@@ -143,19 +140,12 @@ function parseDurationMin(raw: string | null): number {
 let cachedGraph: {
   nodes: Map<string, GraphNode>;
   adjacency: AdjacencyList;
+  source: DataSource;
 } | null = null;
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
-async function buildGraph(): Promise<{
-  nodes: Map<string, GraphNode>;
-  adjacency: AdjacencyList;
-}> {
-  const now = Date.now();
-  if (cachedGraph && (now - lastFetchTime < CACHE_TTL_MS)) {
-    return cachedGraph;
-  }
-
+async function fetchLiveSegments(): Promise<RawSegment[]> {
   const supabase = createServiceClient();
   const segments: RawSegment[] = [];
   let from = 0;
@@ -190,6 +180,32 @@ async function buildGraph(): Promise<{
       hasMore = false;
     }
   }
+  return segments;
+}
+
+/** Live Supabase data when reachable, otherwise the on-device snapshot. */
+async function loadSegments(): Promise<{ segments: RawSegment[]; source: DataSource }> {
+  if (!isOfflineMode()) {
+    try {
+      return { segments: await fetchLiveSegments(), source: 'live' };
+    } catch (err) {
+      console.warn('[routing] Supabase unreachable, using offline route index:', (err as Error).message);
+    }
+  }
+  return { segments: loadOfflineSnapshot().segments, source: 'offline' };
+}
+
+async function buildGraph(): Promise<{
+  nodes: Map<string, GraphNode>;
+  adjacency: AdjacencyList;
+  source: DataSource;
+}> {
+  const now = Date.now();
+  if (cachedGraph && (now - lastFetchTime < CACHE_TTL_MS)) {
+    return cachedGraph;
+  }
+
+  const { segments, source } = await loadSegments();
 
   const nodes = new Map<string, GraphNode>();
   const adjacency: AdjacencyList = new Map();
@@ -311,7 +327,7 @@ async function buildGraph(): Promise<{
     }
   }
 
-  cachedGraph = { nodes, adjacency };
+  cachedGraph = { nodes, adjacency, source };
   lastFetchTime = Date.now();
   return cachedGraph;
 }
@@ -459,7 +475,7 @@ function buildLegs(path: PathStep[]): JourneyLeg[] {
       transportType: lineType,
       signboard:     lineSign,
       stops:         legStops,
-      totalFare:     Math.round(totalFare * 100) / 100,
+      totalFare:     Math.round(Math.max(totalFare, minFare(lineType)) * 100) / 100,
       totalTimeMinutes: Math.round(totalTime),
     } satisfies TransitLeg);
   }
@@ -491,7 +507,7 @@ export async function findRoute(
   const { startLat, startLng, endLat, endLng } = params;
 
   // Build graph
-  const { nodes, adjacency } = await buildGraph();
+  const { nodes, adjacency, source } = await buildGraph();
 
   if (nodes.size === 0) {
     return { success: false, error: 'Transit network is empty — check your database seeding.' };
@@ -538,5 +554,26 @@ export async function findRoute(
     totalTimeMinutes: Math.round(totalTime),
     totalFare:        Math.round(totalFare * 100) / 100,
     legs,
+    dataSource:       source,
   };
+}
+
+export interface TransitStop {
+  name: string;
+  lat: number;
+  lng: number;
+  /** Number of outgoing edges — a proxy for how much of a hub the stop is */
+  degree: number;
+}
+
+/** Every stop in the routing graph (same data source the planner uses). */
+export async function getTransitStops(): Promise<{ stops: TransitStop[]; source: DataSource }> {
+  const { nodes, adjacency, source } = await buildGraph();
+  const stops = Array.from(nodes.values()).map(n => ({
+    name: n.name,
+    lat: n.lat,
+    lng: n.lng,
+    degree: adjacency.get(n.id)?.length ?? 0,
+  }));
+  return { stops, source };
 }
