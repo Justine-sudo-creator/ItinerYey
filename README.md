@@ -27,6 +27,10 @@ NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=of
 OFFLINE_MODE=1 npm run dev
 ```
 
+Or simply `npm run demo` — builds once, serves on the local network and prints the URL for phones.
+
+**On a phone:** turn on the laptop's hotspot (or join the same Wi-Fi), open the printed `http://<laptop-ip>:3000/ask`, and use *Take / upload photo* to scan a real signboard. Nothing leaves the laptop–phone link. *(Windows: allow Node.js through the firewall on "Private" networks when prompted.)*
+
 Open http://localhost:3000/ask, then turn Wi-Fi off and try:
 
 - `Paano pumunta sa SM North galing Cubao?`

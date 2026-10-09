@@ -303,6 +303,9 @@ function ScanTab() {
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  // Live camera needs HTTPS/localhost; phones on the laptop's hotspot use the native camera via the file input.
+  const [liveCamera, setLiveCamera] = useState(false);
+  useEffect(() => setLiveCamera(window.isSecureContext && !!navigator.mediaDevices?.getUserMedia), []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -377,10 +380,10 @@ function ScanTab() {
         <div className="flex flex-wrap gap-2">
           <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold px-4 py-2.5 rounded-lg border-2 border-border-dark bg-white hover:bg-soft-beige">
             <ImagePlus className="w-4 h-4" />
-            Upload photo
+            Take / upload photo
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onFile(e.target.files?.[0])} />
           </label>
-          {cameraOn ? (
+          {!liveCamera ? null : cameraOn ? (
             <SecondaryButton onClick={stopCamera} className="flex items-center gap-2 py-2.5 px-4">
               <X className="w-4 h-4" /> Close camera
             </SecondaryButton>
