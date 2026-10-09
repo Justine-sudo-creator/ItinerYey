@@ -32,7 +32,7 @@ export interface OfflineRoute {
 
 export interface OfflineSnapshot {
   generatedAt: string;
-  source: 'supabase' | 'gtfs';
+  source: 'supabase' | 'gtfs' | 'gtfs+community';
   routes: OfflineRoute[];
   segments: RawSegment[];
 }
@@ -40,7 +40,7 @@ export interface OfflineSnapshot {
 type SnapshotFile = {
   version: 1;
   generatedAt: string;
-  source: 'supabase' | 'gtfs';
+  source: 'supabase' | 'gtfs' | 'gtfs+community';
   routes: [string, string, string, number][];
   segments: [number, string, string | null, number, string | null, number, number, string | null, number, number, string | null][];
 };

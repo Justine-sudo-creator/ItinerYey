@@ -8,7 +8,6 @@
  *   npx tsx scripts/build_offline_snapshot.ts --gtfs ./scratch/gtfs   # from a GTFS feed
  */
 
-import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -36,28 +35,30 @@ type SnapshotSegment = [
 interface Snapshot {
   version: 1;
   generatedAt: string;
-  source: 'supabase' | 'gtfs';
+  source: 'supabase' | 'gtfs' | 'gtfs+community';
   routes: SnapshotRoute[];
   segments: SnapshotSegment[];
 }
 
 // ─── Supabase source ──────────────────────────────────────────────────────────
 
+/** Plain PostgREST over fetch — avoids supabase-js realtime, which needs WebSocket (Node 22+). */
 async function fetchAll<T>(table: string, columns: string): Promise<T[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '');
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const headers: Record<string, string> = { apikey: key };
+  if (!key.startsWith('sb_')) headers.Authorization = `Bearer ${key}`;
   const rows: T[] = [];
   const limit = 1000;
   for (let from = 0; ; from += limit) {
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .order('id')
-      .range(from, from + limit - 1);
-    if (error) throw new Error(`${table}: ${error.message}`);
-    rows.push(...((data ?? []) as T[]));
-    if (!data || data.length < limit) break;
+    const qs = new URLSearchParams({ select: columns.replace(/\s+/g, ''), order: 'id' });
+    const res = await fetch(`${url}/rest/v1/${table}?${qs}`, {
+      headers: { ...headers, Range: `${from}-${from + limit - 1}`, 'Range-Unit': 'items' },
+    });
+    if (!res.ok) throw new Error(`${table}: HTTP ${res.status} ${await res.text()}`);
+    const data = (await res.json()) as T[];
+    rows.push(...data);
+    if (data.length < limit) break;
   }
   return rows;
 }
@@ -249,6 +250,23 @@ async function main() {
   const snapshot = gtfsFlag !== -1
     ? fromGtfs(path.resolve(process.argv[gtfsFlag + 1] ?? 'scratch/gtfs'))
     : await fromSupabase();
+
+  // --with-community: keep GTFS fares, add community-submitted Supabase routes the feed doesn't have.
+  if (gtfsFlag !== -1 && process.argv.includes('--with-community')) {
+    const community = await fromSupabase();
+    const known = new Set(snapshot.segments.map(s => s[2]));
+    let added = 0;
+    community.routes.forEach((route, idx) => {
+      const segs = community.segments.filter(s => s[0] === idx);
+      if (segs.length === 0 || segs.some(s => known.has(s[2]))) return;
+      const newIdx = snapshot.routes.length;
+      snapshot.routes.push(route);
+      for (const s of segs) snapshot.segments.push([newIdx, ...s.slice(1)] as SnapshotSegment);
+      added++;
+    });
+    snapshot.source = 'gtfs+community';
+    console.log(`Added ${added} community routes from Supabase`);
+  }
 
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   fs.writeFileSync(OUT_FILE, zlib.gzipSync(JSON.stringify(snapshot), { level: 9 }));
