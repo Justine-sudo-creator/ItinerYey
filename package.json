@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "demo": "node scripts/demo.mjs"
   },
   "dependencies": {
     "@react-map/philippines": "^1.0.9",
